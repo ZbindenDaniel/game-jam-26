@@ -187,8 +187,12 @@ public class PlayerDrone : MonoBehaviour
     /// </summary>
     public int behaviourtrainingIndex = 0;
     public float behaviourUpdateInterval = 0.5f;
+    [Header("Behaviour Input Debugging")]
+    public bool logBehaviourInputs = false;
+    public float behaviourInputLogInterval = 1f;
     // Timer accumulating deltaTime until the next behaviour update
     private float behaviourTimer = 0f;
+    private float lastBehaviourInputLogTime = float.NegativeInfinity;
     // Behaviour selector neural network instance.  It takes a vector of
     // high‑level state inputs and outputs discrete indices into the parameter
     // set arrays for each PID.
@@ -916,19 +920,28 @@ private float lastShotTime = 0f;
     {
         // Placeholder health: not implemented, so always 1
         float health = 1f;
-        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
-
         // Constant bias term to allow the network to learn an offset
         float bias = 1f;
         // Waypoint active flag: 1 when a waypoint is set, 0 in idle mode
         float waypointActive = currentWaypoint != null ? 1f : 0f;
-        float waypointDistance = currentWaypoint != null ? Vector3.Distance(transform.position, currentWaypoint.position) : 0f;
-
         // Number of obstacles detected in the forward field of view
         float obstacleCount = ComputeObstaclesInFOV();
         // Height of the drone as an input feature
         float height = transform.position.y;
-        return new float[] { speed, waypointDistance, waypointActive, obstacleCount, height };
+        float[] inputs = new float[] { health, bias, waypointActive, obstacleCount, height };
+        if (logBehaviourInputs && (Time.time - lastBehaviourInputLogTime) >= behaviourInputLogInterval)
+        {
+            try
+            {
+                Debug.Log($"Behaviour inputs ({inputs.Length}): health={health:F2} bias={bias:F2} waypointActive={waypointActive:F0} obstacles={obstacleCount:F0} height={height:F2}");
+                lastBehaviourInputLogTime = Time.time;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("Behaviour input logging failed: " + e.Message);
+            }
+        }
+        return inputs;
     }
 
     /// <summary>
