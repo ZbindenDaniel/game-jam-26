@@ -354,9 +354,9 @@ public class PlayerDrone : MonoBehaviour
             rollParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
             rollParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
         }
-        // Instantiate the behaviour selection neural network.  Inputs: health, value,
-        // waypoint active, obstacles count, height.  Outputs: one per PID.
-        // int numInputs = 5;
+        // Instantiate the behaviour selection neural network.  Inputs: health, velocity,
+        // height, waypoint active, waypoint distance, obstacle counts.  Outputs: one per PID.
+        // int numInputs = 8;
         // int numOutputs = 5;
         // int paramCount = Mathf.Min(heightParamSets.Length,
         //                            Mathf.Min(distanceParamSets.Length,
@@ -909,26 +909,29 @@ private float lastShotTime = 0f;
     /// <summary>
     /// Computes the input vector for the behaviour selection neural network.  The
     /// features included here provide a high‑level description of the
-    /// environment and the drone's state: current health (placeholder), a
-    /// constant bias term, whether a waypoint is active (1) or the drone
-    /// is idle (0), the number of detected obstacles in the field of view,
-    /// and the drone's current height (world Y).  Additional inputs can
-    /// easily be added here to enrich the behaviour selection.
+    /// environment and the drone's state: current health (placeholder), velocity,
+    /// height, waypoint active flag, waypoint distance, and obstacle counts
+    /// (below, same/above, forward FOV).  Additional inputs can easily be
+    /// added here to enrich the behaviour selection.
     /// </summary>
     /// <returns>Array of input values matching the number of inputs expected by the neural network.</returns>
     private float[] GetBehaviourInputs()
     {
         // Placeholder health: not implemented, so always 1
         float health = 1f;
-        // Constant bias term to allow the network to learn an offset
-        float bias = 1f;
+        float velocity = rb != null ? rb.linearVelocity.magnitude : 0f;
+
         // Waypoint active flag: 1 when a waypoint is set, 0 in idle mode
         float waypointActive = currentWaypoint != null ? 1f : 0f;
-        // Number of obstacles detected in the forward field of view
-        float obstacleCount = ComputeObstaclesInFOV();
+        float waypointDistance = currentWaypoint != null ? Vector3.Distance(transform.position, currentWaypoint.position) : 0f;
+
         // Height of the drone as an input feature
         float height = transform.position.y;
-        float[] inputs = new float[] { health, bias, waypointActive, obstacleCount, height };
+        int obstaclesBelow;
+        int obstaclesSameOrAbove;
+        int obstaclesInFov;
+        ComputeObstaclePerception(out obstaclesBelow, out obstaclesSameOrAbove, out obstaclesInFov);
+        
         if (logBehaviourInputs && (Time.time - lastBehaviourInputLogTime) >= behaviourInputLogInterval)
         {
             try
@@ -941,34 +944,77 @@ private float lastShotTime = 0f;
                 Debug.LogWarning("Behaviour input logging failed: " + e.Message);
             }
         }
-        return inputs;
+        
+        return new float[]
+        {
+            health,
+            velocity,
+            height,
+            waypointActive,
+            waypointDistance,
+            obstaclesBelow,
+            obstaclesSameOrAbove,
+            obstaclesInFov
+        };
     }
 
     /// <summary>
-    /// Counts the number of obstacles (or other players) detected in the drone's
-    /// forward field of view using a simple raycast fan.  Rays are cast in a
-    /// cone defined by viewAngle and viewDistance.  Any hit on the specified
-    /// obstacleLayers increments the count.  This count is used as an input
-    /// feature for the behaviour selection network.
+    /// Counts the number of obstacles (or other players) beneath the drone,
+    /// at the same level/above, and within the forward field of view using a
+    /// spherical query.  The query is filtered by obstacleLayers.
     /// </summary>
-    /// <returns>The number of raycast hits on obstacles.</returns>
-    private int ComputeObstaclesInFOV()
+    private void ComputeObstaclePerception(out int below, out int sameOrAbove, out int inFov)
     {
-        int count = 0;
-        int rayCount = 5;
-        // Cast rays in the horizontal plane only
-        for (int i = 0; i < rayCount; i++)
+        below = 0;
+        sameOrAbove = 0;
+        inFov = 0;
+        float heightTolerance = 0.5f;
+        Collider[] hits;
+        try
         {
-            float t = rayCount > 1 ? i / (float)(rayCount - 1) : 0.5f;
-            float angle = Mathf.Lerp(-viewAngle, viewAngle, t);
-            Vector3 dir = Quaternion.Euler(0f, angle, 0f) * transform.forward;
-            Ray ray = new Ray(transform.position + Vector3.up * 0.5f, dir);
-            if (Physics.Raycast(ray, out RaycastHit hit, viewDistance, obstacleLayers, QueryTriggerInteraction.Ignore))
+            hits = Physics.OverlapSphere(transform.position, viewDistance, obstacleLayers, QueryTriggerInteraction.Ignore);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"Obstacle perception query failed for {name} at {transform.position}: {e.Message}");
+            return;
+        }
+
+        foreach (Collider hit in hits)
+        {
+            if (hit == null)
             {
-                count++;
+                continue;
+            }
+
+            if (hit.attachedRigidbody == rb || hit.transform == transform)
+            {
+                continue;
+            }
+
+            Vector3 targetPos = hit.bounds.center;
+            float deltaY = targetPos.y - transform.position.y;
+            if (deltaY < -heightTolerance)
+            {
+                below++;
+            }
+            else
+            {
+                sameOrAbove++;
+            }
+
+            Vector3 toTarget = targetPos - transform.position;
+            if (toTarget.sqrMagnitude > 0.0001f)
+            {
+                float angle = Vector3.Angle(transform.forward, toTarget);
+                if (angle <= viewAngle)
+                {
+                    inFov++;
+                }
             }
         }
-        return count;
+
+        return;
     }
 }
 
