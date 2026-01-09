@@ -187,8 +187,12 @@ public class PlayerDrone : MonoBehaviour
     /// </summary>
     public int behaviourtrainingIndex = 0;
     public float behaviourUpdateInterval = 0.5f;
+    [Header("Behaviour Input Debugging")]
+    public bool logBehaviourInputs = false;
+    public float behaviourInputLogInterval = 1f;
     // Timer accumulating deltaTime until the next behaviour update
     private float behaviourTimer = 0f;
+    private float lastBehaviourInputLogTime = float.NegativeInfinity;
     // Behaviour selector neural network instance.  It takes a vector of
     // high‑level state inputs and outputs discrete indices into the parameter
     // set arrays for each PID.
@@ -927,6 +931,20 @@ private float lastShotTime = 0f;
         int obstaclesSameOrAbove;
         int obstaclesInFov;
         ComputeObstaclePerception(out obstaclesBelow, out obstaclesSameOrAbove, out obstaclesInFov);
+        
+        if (logBehaviourInputs && (Time.time - lastBehaviourInputLogTime) >= behaviourInputLogInterval)
+        {
+            try
+            {
+                Debug.Log($"Behaviour inputs ({inputs.Length}): health={health:F2} bias={bias:F2} waypointActive={waypointActive:F0} obstacles={obstacleCount:F0} height={height:F2}");
+                lastBehaviourInputLogTime = Time.time;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("Behaviour input logging failed: " + e.Message);
+            }
+        }
+        
         return new float[]
         {
             health,
