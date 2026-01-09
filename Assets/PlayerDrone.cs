@@ -350,30 +350,24 @@ public class PlayerDrone : MonoBehaviour
             rollParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
             rollParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
         }
-        // Instantiate the behaviour selection neural network.  Inputs: health, value,
-        // waypoint active, obstacles count, height.  Outputs: one per PID.
-        // int numInputs = 5;
-        // int numOutputs = 5;
-        // int paramCount = Mathf.Min(heightParamSets.Length,
-        //                            Mathf.Min(distanceParamSets.Length,
-        //                                      Mathf.Min(pitchParamSets.Length,
-        //                                                Mathf.Min(yawParamSets.Length, rollParamSets.Length))));
-        // // Instantiate the behaviour selection neural network only if there
-        // // are multiple parameter sets to choose from.  If each controller
-        // // has only a single set, disable the behaviour network entirely to
-        // // replicate the original single‑PID behaviour without unnecessary
-        // // updates.
-        // if (paramCount >= 2)
-        // {
-        //     behaviourNN = new BehaviourNN(numInputs, numOutputs, paramCount);
-        //     ApplyBehaviourParameterSets();
-        // }
-        // else
-        // {
-        //     behaviourNN = null;
-        //     // Apply the sole parameter set manually
-        //     ApplyBehaviourParameterSets();
-        // }
+        // Instantiate the behaviour selection neural network.  Inputs: speed, waypoint
+        // distance, waypoint active, obstacles count, height.
+        int numInputs = GetBehaviourInputs()?.Length ?? 0;
+        int paramCount = Mathf.Min(heightParamSets.Length,
+                                   Mathf.Min(distanceParamSets.Length,
+                                             Mathf.Min(pitchParamSets.Length,
+                                                       Mathf.Min(yawParamSets.Length, rollParamSets.Length))));
+        // Instantiate the behaviour selection neural network only if there
+        // are parameter sets to choose from.
+        if (paramCount > 0 && numInputs > 0)
+        {
+            behaviourNN = new BehaviourNN(numInputs, paramCount);
+        }
+        else
+        {
+            behaviourNN = null;
+        }
+        ApplyBehaviourParameterSets();
     }
 
 private float lastShotTime = 0f;
@@ -816,8 +810,15 @@ private float lastShotTime = 0f;
         if (behaviourNN == null) return;
         // Gather high‑level inputs for behaviour selection
         float[] inputs = GetBehaviourInputs();
-        int index = behaviourNN.SelectParamSet(inputs);
-        int behaviourIndex = this.behaviourtrainingIndex;
+        int behaviourIndex = behaviourtrainingIndex;
+        try
+        {
+            behaviourIndex = behaviourNN.SelectParamSet(inputs);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"BehaviourNN selection failed for {name} with inputs length {(inputs == null ? 0 : inputs.Length)}: {e.Message}");
+        }
         // Defensive: ensure arrays are non‑null and indices are clamped
         int countHeight = heightParamSets != null ? heightParamSets.Length : 0;
         int countDistance = distanceParamSets != null ? distanceParamSets.Length : 0;
@@ -894,7 +895,7 @@ private float lastShotTime = 0f;
                 inputCopy = new float[rawInputs.Length];
                 rawInputs.CopyTo(inputCopy, 0);
             }
-            if (inputCopy != null && indexCopy != null)
+            if (inputCopy != null)
             {
                 behaviourTrainingInputs.Add(inputCopy);
                 behaviourTrainingTargets.Add(indexCopy);
