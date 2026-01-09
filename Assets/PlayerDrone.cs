@@ -820,8 +820,15 @@ private float lastShotTime = 0f;
         if (behaviourNN == null) return;
         // Gather high‑level inputs for behaviour selection
         float[] inputs = GetBehaviourInputs();
-        int index = behaviourNN.SelectParamSet(inputs);
-        int behaviourIndex = this.behaviourtrainingIndex;
+        int behaviourIndex = behaviourtrainingIndex;
+        try
+        {
+            behaviourIndex = behaviourNN.SelectParamSet(inputs);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"BehaviourNN selection failed for {name} with inputs length {(inputs == null ? 0 : inputs.Length)}: {e.Message}");
+        }
         // Defensive: ensure arrays are non‑null and indices are clamped
         int countHeight = heightParamSets != null ? heightParamSets.Length : 0;
         int countDistance = distanceParamSets != null ? distanceParamSets.Length : 0;
@@ -898,7 +905,7 @@ private float lastShotTime = 0f;
                 inputCopy = new float[rawInputs.Length];
                 rawInputs.CopyTo(inputCopy, 0);
             }
-            if (inputCopy != null && indexCopy != null)
+            if (inputCopy != null)
             {
                 behaviourTrainingInputs.Add(inputCopy);
                 behaviourTrainingTargets.Add(indexCopy);
