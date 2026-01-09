@@ -1,0 +1,240 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!181963792 &2655988077585873504
+Preset:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: fine-tuned_3
+  m_TargetType:
+    m_NativeTypeID: 114
+    m_ManagedTypePPtr: {fileID: 11500000, guid: 1a1c3a364eb88eac4bd1a9b44e38f925, type: 3}
+    m_ManagedTypeFallback: 
+  m_Properties:
+  - target: {fileID: 0}
+    propertyPath: m_Enabled
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: m_EditorHideFlags
+    value: 0
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: m_EditorClassIdentifier
+    value: Assembly-CSharp::PlayerDrone
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterFL
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterFR
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterBL
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterBR
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawThrusterLeft
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawThrusterRight
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: maxLiftThrustPerThruster
+    value: 22
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: maxYawThrust
+    value: 6
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: maxPitchAngleDeg
+    value: 38
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrustSmoothing
+    value: 0.1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: currentWaypoint
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: targetAltitude
+    value: 7
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: desiredDistance
+    value: 14
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: useSinePath
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pathSpeed
+    value: 5
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pathAmplitudeZ
+    value: 40
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pathFrequency
+    value: 0.01
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: deviationAmplitude
+    value: 15
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: noiseFrequency
+    value: 0.5
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: speedDeviation
+    value: 8
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: speedNoiseFrequency
+    value: 0.4
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidHeight.Kp
+    value: 17.871832
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidHeight.Ki
+    value: 36.96094
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidHeight.Kd
+    value: 150.80042
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidHeight.integralLimit
+    value: 8
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidHeight.activate
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidDistance.Kp
+    value: 4106.376
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidDistance.Ki
+    value: 116849.77
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidDistance.Kd
+    value: 592.4021
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidDistance.integralLimit
+    value: 50
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidDistance.activate
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidPitch.Kp
+    value: 0.21145163
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidPitch.Ki
+    value: 0.17674659
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidPitch.Kd
+    value: 2.4971166
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidPitch.integralLimit
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidPitch.activate
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidYaw.Kp
+    value: 2.0035586
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidYaw.Ki
+    value: 1.8026519
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidYaw.Kd
+    value: 8.073761
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidYaw.integralLimit
+    value: 5
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidYaw.activate
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidRoll.Kp
+    value: 0.1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidRoll.Ki
+    value: 0.01
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidRoll.Kd
+    value: 0.1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidRoll.integralLimit
+    value: 10
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pidRoll.activate
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: enableAutoTuning
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: learningRate
+    value: 0.0001
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: runDuration
+    value: 100
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: display
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: persistMetrics
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: metricsFilename
+    value: drone_metrics.json
+    objectReference: {fileID: 0}
+  m_ExcludedProperties: []
+  m_CoupledType:
+    m_NativeTypeID: 0
+    m_ManagedTypePPtr: {fileID: 0}
+    m_ManagedTypeFallback: 
+  m_CoupledProperties: []

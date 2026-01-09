@@ -1,0 +1,392 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!181963792 &2655988077585873504
+Preset:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PlayerDrone_V2_0
+  m_TargetType:
+    m_NativeTypeID: 114
+    m_ManagedTypePPtr: {fileID: 11500000, guid: 1a1c3a364eb88eac4bd1a9b44e38f925, type: 3}
+    m_ManagedTypeFallback: 
+  m_Properties:
+  - target: {fileID: 0}
+    propertyPath: m_Enabled
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: m_EditorHideFlags
+    value: 0
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: m_EditorClassIdentifier
+    value: Assembly-CSharp::PlayerDrone
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterFL
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterFR
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterBL
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrusterBR
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawThrusterLeft
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawThrusterRight
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: maxLiftThrustPerThruster
+    value: 30
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: maxYawThrust
+    value: 10
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: maxPitchAngleDeg
+    value: 40
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: thrustSmoothing
+    value: 0.39999998
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: currentWaypoint
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: targetAltitude
+    value: 12
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: desiredDistance
+    value: 10
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: viewAngle
+    value: 10
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: viewDistance
+    value: 35
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleMode
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleCenter.x
+    value: 500
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleCenter.y
+    value: 30
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleCenter.z
+    value: 500
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleRadius
+    value: 100
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleAngularSpeed
+    value: 0.01
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleDeviationAmplitude
+    value: 20
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: idleNoiseFrequency
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: optimiseHeightPID
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: optimiseDistancePID
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: optimisePitchPID
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: optimiseYawPID
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: optimiseRollPID
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: enableAutoTuning
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: learningRate
+    value: 0.0000001
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: runDuration
+    value: 120
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: display
+    value: 
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: persistMetrics
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: metricsFilename
+    value: drone_metrics.json
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.size
+    value: 3
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[0].Kp
+    value: 2.3
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[0].Ki
+    value: 0.2
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[0].Kd
+    value: 1.2
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[1].Kp
+    value: 2.29985
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[1].Ki
+    value: 0.2169
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[1].Kd
+    value: 1.2043
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[2].Kp
+    value: 2.3200545
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[2].Ki
+    value: 5.4898148
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: heightParamSets.Array.data[2].Kd
+    value: 1.4001977
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.size
+    value: 3
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[0].Kp
+    value: 1.77
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[0].Ki
+    value: 2.3
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[0].Kd
+    value: 0.38
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[1].Kp
+    value: 1.7765
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[1].Ki
+    value: 11.564
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[1].Kd
+    value: 0.4669
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[2].Kp
+    value: 3.912716
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[2].Ki
+    value: 1556.6753
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: distanceParamSets.Array.data[2].Kd
+    value: 23.021074
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.size
+    value: 3
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[0].Kp
+    value: 0.0016794655
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[0].Ki
+    value: 0.0021910984
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[0].Kd
+    value: 0.37019503
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[1].Kp
+    value: 0.0015848599
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[1].Ki
+    value: 0.0019801203
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[1].Kd
+    value: 0.37000027
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[2].Kp
+    value: 0.0077433423
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[2].Ki
+    value: 0.033001382
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: pitchParamSets.Array.data[2].Kd
+    value: 0.39260498
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.size
+    value: 3
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[0].Kp
+    value: 0.09799931
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[0].Ki
+    value: 0.00530728
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[0].Kd
+    value: 0.053084537
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[1].Kp
+    value: 0.097999685
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[1].Ki
+    value: 0.0053003808
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[1].Kd
+    value: 0.050052766
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[2].Kp
+    value: 0.096597515
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[2].Ki
+    value: 0.032768544
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: yawParamSets.Array.data[2].Kd
+    value: 0.58898395
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.size
+    value: 3
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[0].Kp
+    value: 0.04
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[0].Ki
+    value: 0
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[0].Kd
+    value: 0
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[1].Kp
+    value: 0.0403
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[1].Ki
+    value: 0.0007239
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[1].Kd
+    value: 0.00138
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[2].Kp
+    value: 0.039000526
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[2].Ki
+    value: 0.0004228392
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: rollParamSets.Array.data[2].Kd
+    value: 0.00070684124
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: behaviourUpdateInterval
+    value: 0.5
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: obstacleLayers.m_Bits
+    value: 4294967295
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: enableBehaviourTraining
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: behaviourTrainingInterval
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: behaviourLearningRate
+    value: 0.001
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: behaviourEpochs
+    value: 25
+    objectReference: {fileID: 0}
+  m_ExcludedProperties: []
+  m_CoupledType:
+    m_NativeTypeID: 0
+    m_ManagedTypePPtr: {fileID: 0}
+    m_ManagedTypeFallback: 
+  m_CoupledProperties: []
