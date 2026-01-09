@@ -158,10 +158,6 @@ public class PlayerDrone : MonoBehaviour
     /// <summary>Name of the JSON file to write metrics to.</summary>
     public string metricsFilename = "drone_metrics.json";
 
-    [Header("Training Persistence")]
-    /// <summary>Optional identifier used to persist training state per drone.</summary>
-    public string persistenceId = "";
-
     // ------------------------------------------------------------------------
     // PID parameter sets and behaviour selector
     // ------------------------------------------------------------------------
@@ -197,6 +193,7 @@ public class PlayerDrone : MonoBehaviour
     // high‑level state inputs and outputs discrete indices into the parameter
     // set arrays for each PID.
     public BehaviourNN behaviourNN;
+    private static BehaviourNN sharedBehaviourNN;
     /// <summary>Layer mask used to identify obstacles for behaviour selection.
     /// This is separate from the field of view used for targeting.  Configure
     /// this to include objects that should contribute to the obstacles count.
@@ -670,17 +667,22 @@ private float lastShotTime = 0f;
             behaviourNN = null;
             return;
         }
-        if (behaviourNN == null)
+        if (sharedBehaviourNN == null || sharedBehaviourNN.ParamCount != paramCount || sharedBehaviourNN.InputCount != 5)
         {
             int numInputs = 5;
-            behaviourNN = new BehaviourNN(numInputs, paramCount);
+            if (sharedBehaviourNN != null)
+            {
+                Debug.LogWarning($"BehaviourNN singleton reset due to shape mismatch for {gameObject.name}.");
+            }
+            sharedBehaviourNN = new BehaviourNN(numInputs, paramCount);
         }
+        behaviourNN = sharedBehaviourNN;
     }
 
     private void LoadTrainingState()
     {
         if (behaviourNN == null) return;
-        string droneId = GetPersistenceId();
+        string droneId = gameObject.name;
         if (PersistenceManager.TryLoad(droneId, behaviourNN, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex))
         {
             ApplyPersistedParameterSets(heightIndex, distanceIndex, pitchIndex, yawIndex, rollIndex);
@@ -690,13 +692,8 @@ private float lastShotTime = 0f;
     private void SaveTrainingState()
     {
         if (behaviourNN == null) return;
-        string droneId = GetPersistenceId();
+        string droneId = gameObject.name;
         PersistenceManager.TrySave(droneId, behaviourNN, currentHeightSetIndex, currentDistanceSetIndex, currentPitchSetIndex, currentYawSetIndex, currentRollSetIndex);
-    }
-
-    private string GetPersistenceId()
-    {
-        return string.IsNullOrWhiteSpace(persistenceId) ? gameObject.name : persistenceId;
     }
 
     private void ApplyPersistedParameterSets(int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex)
