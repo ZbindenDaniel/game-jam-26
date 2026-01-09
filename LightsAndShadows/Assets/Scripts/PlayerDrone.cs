@@ -387,7 +387,7 @@ private float lastShotTime = 0f;
         }
         else
         {
-            targetPos = transform.position;
+            targetPos = new Vector3(13f,2f,18f); // hover in place
         }
         Debug.DrawLine(transform.position, targetPos);
 
