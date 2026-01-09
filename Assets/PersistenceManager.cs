@@ -8,10 +8,6 @@ public static class PersistenceManager
     [System.Serializable]
     private class DronePersistenceData
     {
-        public int inputCount;
-        public int paramCount;
-        public float[] weights;
-        public float bias;
         public int heightIndex;
         public int distanceIndex;
         public int pitchIndex;
@@ -19,7 +15,16 @@ public static class PersistenceManager
         public int rollIndex;
     }
 
-    public static bool TryLoad(string droneId, BehaviourNN behaviour, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex)
+    [System.Serializable]
+    private class BehaviourPersistenceData
+    {
+        public int inputCount;
+        public int paramCount;
+        public float[] weights;
+        public float bias;
+    }
+
+    public static bool TryLoadDroneIndices(string droneId, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex)
     {
         heightIndex = 0;
         distanceIndex = 0;
@@ -27,16 +32,10 @@ public static class PersistenceManager
         yawIndex = 0;
         rollIndex = 0;
 
-        if (behaviour == null)
-        {
-            Debug.LogWarning($"Persistence load skipped: missing BehaviourNN for drone {droneId}.");
-            return false;
-        }
-
-        string path = GetPath(droneId);
+        string path = GetDronePath(droneId);
         if (!File.Exists(path))
         {
-            Debug.Log($"Persistence load skipped: no data at {path} for drone {droneId}.");
+            Debug.Log($"Drone persistence load skipped: no data at {path} for drone {droneId}.");
             return false;
         }
 
@@ -46,23 +45,7 @@ public static class PersistenceManager
             DronePersistenceData data = JsonUtility.FromJson<DronePersistenceData>(json);
             if (data == null)
             {
-                Debug.LogWarning($"Persistence load failed: invalid JSON at {path} for drone {droneId}.");
-                return false;
-            }
-            if (data.inputCount != behaviour.InputCount || data.paramCount != behaviour.ParamCount)
-            {
-                Debug.LogWarning($"Persistence load discarded: shape mismatch at {path} for drone {droneId} (inputs {data.inputCount} vs {behaviour.InputCount}, params {data.paramCount} vs {behaviour.ParamCount}).");
-                return false;
-            }
-            if (data.weights == null || data.weights.Length != behaviour.InputCount)
-            {
-                Debug.LogWarning($"Persistence load discarded: weight length mismatch at {path} for drone {droneId}.");
-                return false;
-            }
-
-            if (!behaviour.TryApplyWeights(data.weights, data.bias))
-            {
-                Debug.LogWarning($"Persistence load discarded: failed to apply weights at {path} for drone {droneId}.");
+                Debug.LogWarning($"Drone persistence load failed: invalid JSON at {path} for drone {droneId}.");
                 return false;
             }
 
@@ -72,34 +55,24 @@ public static class PersistenceManager
             yawIndex = data.yawIndex;
             rollIndex = data.rollIndex;
 
-            Debug.Log($"Persistence load succeeded at {path} for drone {droneId}.");
+            Debug.Log($"Drone persistence load succeeded at {path} for drone {droneId}.");
             return true;
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Persistence load failed at {path} for drone {droneId}: {e.Message}");
+            Debug.LogError($"Drone persistence load failed at {path} for drone {droneId}: {e.Message}");
             return false;
         }
     }
 
-    public static bool TrySave(string droneId, BehaviourNN behaviour, int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex)
+    public static bool TrySaveDroneIndices(string droneId, int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex)
     {
-        if (behaviour == null)
-        {
-            Debug.LogWarning($"Persistence save skipped: missing BehaviourNN for drone {droneId}.");
-            return false;
-        }
-
-        string path = GetPath(droneId);
+        string path = GetDronePath(droneId);
         try
         {
             EnsureTrainingFolderExists();
             DronePersistenceData data = new DronePersistenceData
             {
-                inputCount = behaviour.InputCount,
-                paramCount = behaviour.ParamCount,
-                weights = behaviour.GetWeightsCopy(),
-                bias = behaviour.Bias,
                 heightIndex = heightIndex,
                 distanceIndex = distanceIndex,
                 pitchIndex = pitchIndex,
@@ -109,12 +82,95 @@ public static class PersistenceManager
 
             string json = JsonUtility.ToJson(data, true);
             File.WriteAllText(path, json);
-            Debug.Log($"Persistence save succeeded at {path} for drone {droneId}.");
+            Debug.Log($"Drone persistence save succeeded at {path} for drone {droneId}.");
             return true;
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Persistence save failed at {path} for drone {droneId}: {e.Message}");
+            Debug.LogError($"Drone persistence save failed at {path} for drone {droneId}: {e.Message}");
+            return false;
+        }
+    }
+
+    public static bool TryLoadBehaviourWeights(string behaviourId, BehaviourNN behaviour)
+    {
+        if (behaviour == null)
+        {
+            Debug.LogWarning($"Behaviour persistence load skipped: missing BehaviourNN for {behaviourId}.");
+            return false;
+        }
+
+        string path = GetBehaviourPath(behaviourId);
+        if (!File.Exists(path))
+        {
+            Debug.Log($"Behaviour persistence load skipped: no data at {path} for {behaviourId}.");
+            return false;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(path);
+            BehaviourPersistenceData data = JsonUtility.FromJson<BehaviourPersistenceData>(json);
+            if (data == null)
+            {
+                Debug.LogWarning($"Behaviour persistence load failed: invalid JSON at {path} for {behaviourId}.");
+                return false;
+            }
+            if (data.inputCount != behaviour.InputCount || data.paramCount != behaviour.ParamCount)
+            {
+                Debug.LogWarning($"Behaviour persistence load discarded: shape mismatch at {path} for {behaviourId} (inputs {data.inputCount} vs {behaviour.InputCount}, params {data.paramCount} vs {behaviour.ParamCount}).");
+                return false;
+            }
+            if (data.weights == null || data.weights.Length != behaviour.InputCount)
+            {
+                Debug.LogWarning($"Behaviour persistence load discarded: weight length mismatch at {path} for {behaviourId}.");
+                return false;
+            }
+
+            if (!behaviour.TryApplyWeights(data.weights, data.bias))
+            {
+                Debug.LogWarning($"Behaviour persistence load discarded: failed to apply weights at {path} for {behaviourId}.");
+                return false;
+            }
+
+            Debug.Log($"Behaviour persistence load succeeded at {path} for {behaviourId}.");
+            return true;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Behaviour persistence load failed at {path} for {behaviourId}: {e.Message}");
+            return false;
+        }
+    }
+
+    public static bool TrySaveBehaviourWeights(string behaviourId, BehaviourNN behaviour)
+    {
+        if (behaviour == null)
+        {
+            Debug.LogWarning($"Behaviour persistence save skipped: missing BehaviourNN for {behaviourId}.");
+            return false;
+        }
+
+        string path = GetBehaviourPath(behaviourId);
+        try
+        {
+            EnsureTrainingFolderExists();
+            BehaviourPersistenceData data = new BehaviourPersistenceData
+            {
+                inputCount = behaviour.InputCount,
+                paramCount = behaviour.ParamCount,
+                weights = behaviour.GetWeightsCopy(),
+                bias = behaviour.Bias
+            };
+
+            string json = JsonUtility.ToJson(data, true);
+            File.WriteAllText(path, json);
+            Debug.Log($"Behaviour persistence save succeeded at {path} for {behaviourId}.");
+            return true;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Behaviour persistence save failed at {path} for {behaviourId}: {e.Message}");
             return false;
         }
     }
@@ -127,10 +183,16 @@ public static class PersistenceManager
         }
     }
 
-    private static string GetPath(string droneId)
+    private static string GetDronePath(string droneId)
     {
         string safeId = string.IsNullOrWhiteSpace(droneId) ? "drone" : SanitizeFileName(droneId);
-        return Path.Combine(TrainingDataFolder, $"drone_{safeId}_persistence.json");
+        return Path.Combine(TrainingDataFolder, $"drone_{safeId}_pid.json");
+    }
+
+    private static string GetBehaviourPath(string behaviourId)
+    {
+        string safeId = string.IsNullOrWhiteSpace(behaviourId) ? "behaviour" : SanitizeFileName(behaviourId);
+        return Path.Combine(TrainingDataFolder, $"behaviour_{safeId}_weights.json");
     }
 
     private static string SanitizeFileName(string input)

@@ -39,6 +39,12 @@ public class BehaviourNN : MonoBehaviour
     public int InputCount => numInputs;
     public int ParamCount => paramCount;
     public float Bias => bias;
+    public bool persistWeights = true;
+
+    private void Awake()
+    {
+        LoadWeights();
+    }
 
     /// <summary>
     /// Constructs a BehaviourNN with the specified dimensions.  Weights are
@@ -186,6 +192,30 @@ public class BehaviourNN : MonoBehaviour
         }
         bias = newBias;
         return true;
+    }
+
+    private void OnDisable()
+    {
+        SaveWeights();
+    }
+
+    private void OnApplicationQuit()
+    {
+        SaveWeights();
+    }
+
+    private void LoadWeights()
+    {
+        if (!persistWeights) return;
+        string behaviourId = gameObject != null ? gameObject.name : "BehaviourNN";
+        PersistenceManager.TryLoadBehaviourWeights(behaviourId, this);
+    }
+
+    private void SaveWeights()
+    {
+        if (!persistWeights) return;
+        string behaviourId = gameObject != null ? gameObject.name : "BehaviourNN";
+        PersistenceManager.TrySaveBehaviourWeights(behaviourId, this);
     }
 
     private static float Sigmoid(float x)
