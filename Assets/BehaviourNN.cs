@@ -36,6 +36,16 @@ public class BehaviourNN : MonoBehaviour
     private readonly float[] weights; // weights[input]
     private float bias;
 
+    public int InputCount => numInputs;
+    public int ParamCount => paramCount;
+    public float Bias => bias;
+    public bool persistWeights = true;
+
+    private void Awake()
+    {
+        LoadWeights();
+    }
+
     /// <summary>
     /// Constructs a BehaviourNN with the specified dimensions.  Weights are
     /// initialised to small random values and biases are zero.  The number
@@ -161,6 +171,51 @@ public class BehaviourNN : MonoBehaviour
         float[][] inputs = new float[1][] { input };
         int[] targets = new int[1] { targetIndex };
         Train(inputs, targets, learningRate, 1);
+    }
+
+    public float[] GetWeightsCopy()
+    {
+        float[] copy = new float[weights.Length];
+        weights.CopyTo(copy, 0);
+        return copy;
+    }
+
+    public bool TryApplyWeights(float[] newWeights, float newBias)
+    {
+        if (newWeights == null || newWeights.Length != weights.Length)
+        {
+            return false;
+        }
+        for (int i = 0; i < weights.Length; i++)
+        {
+            weights[i] = newWeights[i];
+        }
+        bias = newBias;
+        return true;
+    }
+
+    private void OnDisable()
+    {
+        SaveWeights();
+    }
+
+    private void OnApplicationQuit()
+    {
+        SaveWeights();
+    }
+
+    private void LoadWeights()
+    {
+        if (!persistWeights) return;
+        string behaviourId = gameObject != null ? gameObject.name : "BehaviourNN";
+        PersistenceManager.TryLoadBehaviourWeights(behaviourId, this);
+    }
+
+    private void SaveWeights()
+    {
+        if (!persistWeights) return;
+        string behaviourId = gameObject != null ? gameObject.name : "BehaviourNN";
+        PersistenceManager.TrySaveBehaviourWeights(behaviourId, this);
     }
 
     private static float Sigmoid(float x)
