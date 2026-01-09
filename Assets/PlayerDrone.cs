@@ -354,30 +354,8 @@ public class PlayerDrone : MonoBehaviour
             rollParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
             rollParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
         }
-        // Instantiate the behaviour selection neural network.  Inputs: health, velocity,
-        // height, waypoint active, waypoint distance, obstacle counts.  Outputs: one per PID.
-        // int numInputs = 8;
-        // int numOutputs = 5;
-        // int paramCount = Mathf.Min(heightParamSets.Length,
-        //                            Mathf.Min(distanceParamSets.Length,
-        //                                      Mathf.Min(pitchParamSets.Length,
-        //                                                Mathf.Min(yawParamSets.Length, rollParamSets.Length))));
-        // // Instantiate the behaviour selection neural network only if there
-        // // are multiple parameter sets to choose from.  If each controller
-        // // has only a single set, disable the behaviour network entirely to
-        // // replicate the original single‑PID behaviour without unnecessary
-        // // updates.
-        // if (paramCount >= 2)
-        // {
-        //     behaviourNN = new BehaviourNN(numInputs, numOutputs, paramCount);
-        //     ApplyBehaviourParameterSets();
-        // }
-        // else
-        // {
-        //     behaviourNN = null;
-        //     // Apply the sole parameter set manually
-        //     ApplyBehaviourParameterSets();
-        // }
+        InitializeBehaviourNetwork();
+        LoadTrainingState();
     }
 
 private float lastShotTime = 0f;
@@ -666,6 +644,7 @@ private float lastShotTime = 0f;
     private void OnApplicationQuit()
     {
         SaveMetricsToFile();
+        SaveTrainingState();
     }
 
     /// <summary>
@@ -677,6 +656,63 @@ private float lastShotTime = 0f;
     private void OnDisable()
     {
         SaveMetricsToFile();
+        SaveTrainingState();
+    }
+
+    private void InitializeBehaviourNetwork()
+    {
+        int paramCount = Mathf.Min(heightParamSets.Length,
+                                   Mathf.Min(distanceParamSets.Length,
+                                             Mathf.Min(pitchParamSets.Length,
+                                                       Mathf.Min(yawParamSets.Length, rollParamSets.Length))));
+        if (paramCount <= 0)
+        {
+            behaviourNN = null;
+            return;
+        }
+        if (behaviourNN == null)
+        {
+            int numInputs = 5;
+            behaviourNN = new BehaviourNN(numInputs, paramCount);
+        }
+    }
+
+    private void LoadTrainingState()
+    {
+        string droneId = gameObject.name;
+        if (PersistenceManager.TryLoadDroneIndices(droneId, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex))
+        {
+            ApplyPersistedParameterSets(heightIndex, distanceIndex, pitchIndex, yawIndex, rollIndex);
+        }
+    }
+
+    private void SaveTrainingState()
+    {
+        string droneId = gameObject.name;
+        PersistenceManager.TrySaveDroneIndices(droneId, currentHeightSetIndex, currentDistanceSetIndex, currentPitchSetIndex, currentYawSetIndex, currentRollSetIndex);
+    }
+
+    private void ApplyPersistedParameterSets(int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex)
+    {
+        ApplyPIDIndex(heightParamSets, heightPID, ref currentHeightSetIndex, heightIndex);
+        ApplyPIDIndex(distanceParamSets, distancePID, ref currentDistanceSetIndex, distanceIndex);
+        ApplyPIDIndex(pitchParamSets, pitchPID, ref currentPitchSetIndex, pitchIndex);
+        ApplyPIDIndex(yawParamSets, yawPID, ref currentYawSetIndex, yawIndex);
+        ApplyPIDIndex(rollParamSets, rollPID, ref currentRollSetIndex, rollIndex);
+    }
+
+    private void ApplyPIDIndex(PIDGains[] sets, AutoTunePID pid, ref int currentIndex, int desiredIndex)
+    {
+        if (sets == null || sets.Length == 0 || pid == null)
+        {
+            return;
+        }
+        int idx = Mathf.Clamp(desiredIndex, 0, sets.Length - 1);
+        currentIndex = idx;
+        var g = sets[idx];
+        pid.controller.Kp = g.Kp;
+        pid.controller.Ki = g.Ki;
+        pid.controller.Kd = g.Kd;
     }
 
     /// <summary>
