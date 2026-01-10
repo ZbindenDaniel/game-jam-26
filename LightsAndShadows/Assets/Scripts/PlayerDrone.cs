@@ -235,6 +235,7 @@ public class PlayerDrone : MonoBehaviour
     private float sumSqYawError;
     // Additional metrics: time spent inverted and maximum absolute errors for diagnostics
     private float sumInvertedTime;
+    private float sumSpeed;
     private float maxAbsHeightError;
     private float maxAbsDistanceError;
     private float maxAbsYawError;
@@ -244,6 +245,18 @@ public class PlayerDrone : MonoBehaviour
     private float defaultAltitude;
     private float dynamicAltitudeOffset;
     private float lastAvoidanceLogTime = float.NegativeInfinity;
+    private bool loggedGoalProfileThisEpisode;
+
+    // ------------------------------------------------------------------------
+    // Goal profile settings
+    // ------------------------------------------------------------------------
+    [Header("Goal Profiles")]
+    [Tooltip("Index into the goal profile array used to weight composite metrics.")]
+    public int goalProfileIndex = 0;
+    [Tooltip("Profiles defining how composite metrics are weighted.")]
+    public DroneGoalProfile[] goalProfiles;
+    [Tooltip("Log the active profile name/weights once per episode.")]
+    public bool logGoalProfilePerEpisode = true;
 
     // ------------------------------------------------------------------------
     // Behaviour neural network training settings
@@ -299,6 +312,7 @@ public class PlayerDrone : MonoBehaviour
         {
             idlePath = new CircularPathGenerator(idleCenter, idleRadius, idleAngularSpeed, idleDeviationAmplitude, idleNoiseFrequency);
         }
+        InitializeGoalProfiles();
 
         // Initialise private PID controllers for height, distance, pitch, yaw and roll.  These
         // replace the public declarations and are not exposed in the inspector.  They
@@ -542,6 +556,10 @@ private float lastShotTime = 0f;
         sumSqHeightError += heightError * heightError * dt;
         sumSqDistanceError += distanceError * distanceError * dt;
         sumSqYawError += yawErrorDeg * yawErrorDeg * dt;
+        if (rb != null)
+        {
+            sumSpeed += rb.linearVelocity.magnitude * dt;
+        }
 
         // If auto tuning is enabled, accumulate gradient information for each PID via the AutoTune wrappers
         if (enableAutoTuning)
@@ -611,20 +629,80 @@ private float lastShotTime = 0f;
         return obstacleVector;
     }
 
+    private void InitializeGoalProfiles()
+    {
+        if (goalProfiles == null || goalProfiles.Length == 0)
+        {
+            goalProfiles = new[]
+            {
+                DroneGoalProfile.Default
+            };
+        }
+
+        goalProfileIndex = Mathf.Clamp(goalProfileIndex, 0, goalProfiles.Length - 1);
+    }
+
+    private int GetActiveGoalProfileIndex()
+    {
+        if (goalProfiles == null || goalProfiles.Length == 0)
+        {
+            return 0;
+        }
+
+        return Mathf.Clamp(goalProfileIndex, 0, goalProfiles.Length - 1);
+    }
+
+    private DroneGoalProfile GetActiveGoalProfile()
+    {
+        if (goalProfiles == null || goalProfiles.Length == 0)
+        {
+            return DroneGoalProfile.Default;
+        }
+
+        return goalProfiles[GetActiveGoalProfileIndex()];
+    }
+
+    private void LogGoalProfileIfNeeded(DroneGoalProfile profile)
+    {
+        if (!logGoalProfilePerEpisode || loggedGoalProfileThisEpisode)
+        {
+            return;
+        }
+
+        try
+        {
+            string profileName = string.IsNullOrWhiteSpace(profile.profileName) ? "Unnamed" : profile.profileName;
+            Debug.Log($"[PlayerDrone] Goal profile '{profileName}' weights: height={profile.heightWeight:F2}, distance={profile.distanceWeight:F2}, yaw={profile.yawWeight:F2}, stability={profile.stabilityWeight:F2}, speed={profile.speedWeight:F2}.");
+            loggedGoalProfileThisEpisode = true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Goal profile logging failed: {ex.Message}");
+        }
+    }
+
 
     /// <summary>
     /// Records the metrics for the current episode, displays them and adds them to
-    /// the metrics list.  The average composite error is computed as the sum of
-    /// squared height, distance and yaw errors divided by the elapsed time.
+    /// the metrics list.  The average composite error is computed as a weighted
+    /// sum using the active goal profile.
     /// </summary>
     private void RecordMetrics()
     {
         float avgHeight = simulationTimer > 0f ? sumSqHeightError / simulationTimer : 0f;
         float avgDist = simulationTimer > 0f ? sumSqDistanceError / simulationTimer : 0f;
         float avgYaw = simulationTimer > 0f ? sumSqYawError / simulationTimer : 0f;
+        float avgSpeed = simulationTimer > 0f ? sumSpeed / simulationTimer : 0f;
         // Average proportion of time the drone spent inverted during the episode
         float invertRatio = simulationTimer > 0f ? sumInvertedTime / simulationTimer : 0f;
-        float composite = avgHeight + avgDist + avgYaw;
+        int activeProfileIndex = GetActiveGoalProfileIndex();
+        DroneGoalProfile profile = GetActiveGoalProfile();
+        LogGoalProfileIfNeeded(profile);
+        float composite = (avgHeight * profile.heightWeight)
+            + (avgDist * profile.distanceWeight)
+            + (avgYaw * profile.yawWeight)
+            + (invertRatio * profile.stabilityWeight)
+            + (avgSpeed * profile.speedWeight);
         var rm = new RunMetric
         {
             runIndex = runCount,
@@ -632,11 +710,19 @@ private float lastShotTime = 0f;
             avgHeightError = avgHeight,
             avgDistanceError = avgDist,
             avgYawError = avgYaw,
+            avgSpeed = avgSpeed,
             invertedTime = sumInvertedTime,
             invertRatio = invertRatio,
             maxHeightError = maxAbsHeightError,
             maxDistanceError = maxAbsDistanceError,
             maxYawError = maxAbsYawError,
+            goalProfileIndex = activeProfileIndex,
+            goalProfileName = profile.profileName,
+            goalHeightWeight = profile.heightWeight,
+            goalDistanceWeight = profile.distanceWeight,
+            goalYawWeight = profile.yawWeight,
+            goalStabilityWeight = profile.stabilityWeight,
+            goalSpeedWeight = profile.speedWeight,
             heightKp = heightPID.controller.Kp,
             heightKi = heightPID.controller.Ki,
             heightKd = heightPID.controller.Kd,
@@ -683,9 +769,11 @@ private float lastShotTime = 0f;
         sumSqDistanceError = 0f;
         sumSqYawError = 0f;
         sumInvertedTime = 0f;
+        sumSpeed = 0f;
         maxAbsHeightError = 0f;
         maxAbsDistanceError = 0f;
         maxAbsYawError = 0f;
+        loggedGoalProfileThisEpisode = false;
         // Reset physical state
         transform.position = initialPosition;
         transform.rotation = initialRotation;
@@ -824,7 +912,11 @@ private float lastShotTime = 0f;
         if (!persistMetrics || metrics.Count == 0) return;
         try
         {
-            var wrapper = new MetricsWrapper { runs = metrics };
+            var wrapper = new MetricsWrapper
+            {
+                runs = metrics,
+                goalProfiles = goalProfiles != null ? new List<DroneGoalProfile>(goalProfiles) : new List<DroneGoalProfile>()
+            };
             string json = JsonUtility.ToJson(wrapper, true);
             string path = Path.Combine(Application.persistentDataPath, metricsFilename);
             File.WriteAllText(path, json);
@@ -1161,6 +1253,31 @@ private float lastShotTime = 0f;
 }
 
 /// <summary>
+/// Defines a goal profile that weights different metrics when computing a
+/// composite objective score.
+/// </summary>
+[System.Serializable]
+public struct DroneGoalProfile
+{
+    public string profileName;
+    public float heightWeight;
+    public float distanceWeight;
+    public float yawWeight;
+    public float stabilityWeight;
+    public float speedWeight;
+
+    public static DroneGoalProfile Default => new DroneGoalProfile
+    {
+        profileName = "Default",
+        heightWeight = 1f,
+        distanceWeight = 1f,
+        yawWeight = 1f,
+        stabilityWeight = 0f,
+        speedWeight = 0f
+    };
+}
+
+/// <summary>
 /// Holds aggregated information about a single run.  The average errors are
 /// stored separately for height, distance and yaw as well as the sum of these
 /// for convenience.  The PID gains at the end of the run are also recorded
@@ -1175,6 +1292,7 @@ public class RunMetric
     public float avgHeightError;
     public float avgDistanceError;
     public float avgYawError;
+    public float avgSpeed;
     // Inverse orientation metrics: total time drone was inverted and fraction of episode inverted
     public float invertedTime;
     public float invertRatio;
@@ -1182,6 +1300,13 @@ public class RunMetric
     public float maxHeightError;
     public float maxDistanceError;
     public float maxYawError;
+    public int goalProfileIndex;
+    public string goalProfileName;
+    public float goalHeightWeight;
+    public float goalDistanceWeight;
+    public float goalYawWeight;
+    public float goalStabilityWeight;
+    public float goalSpeedWeight;
     public float heightKp, heightKi, heightKd;
     public float distanceKp, distanceKi, distanceKd;
     public float pitchKp, pitchKi, pitchKd;
@@ -1199,6 +1324,7 @@ public class RunMetric
 public class MetricsWrapper
 {
     public List<RunMetric> runs;
+    public List<DroneGoalProfile> goalProfiles;
 }
 
 /// <summary>
