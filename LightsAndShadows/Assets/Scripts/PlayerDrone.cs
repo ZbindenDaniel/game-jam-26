@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -202,6 +203,11 @@ public class PlayerDrone : MonoBehaviour
     /// this to include objects that should contribute to the obstacles count.
     /// </summary>
     public LayerMask obstacleLayers = ~0;
+    [Header("Avoidance Settings")]
+    public float maxAvoidanceClimb = 3f;
+    public float avoidanceDotThreshold = -0.1f;
+    public float avoidanceMinMagnitude = 0.5f;
+    public float avoidanceLogInterval = 1f;
 
     // Currently selected parameter set indices for each PID.  These
     // variables store which set was chosen during the last behaviour
@@ -235,6 +241,9 @@ public class PlayerDrone : MonoBehaviour
     private int runCount;
     private float lastAvgError;
     private readonly List<RunMetric> metrics = new List<RunMetric>();
+    private float defaultAltitude;
+    private float dynamicAltitudeOffset;
+    private float lastAvoidanceLogTime = float.NegativeInfinity;
 
     // ------------------------------------------------------------------------
     // Behaviour neural network training settings
@@ -275,6 +284,7 @@ public class PlayerDrone : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         initialPosition = transform.position;
         initialRotation = transform.rotation;
+        defaultAltitude = targetAltitude;
         if (currentWaypoint != null)
         {
             waypointStartPos = currentWaypoint.position;
@@ -426,8 +436,41 @@ private float lastShotTime = 0f;
 
         // Compute control errors
         Vector3 toTarget = targetPos - transform.position;
+        Vector3 obstacleVector = CalculateObstacleVector();
+        Vector3 desiredMovement = (toTarget + obstacleVector) * 0.5f;
+        float obstacleMagnitude = obstacleVector.magnitude;
+        float waypointMagnitude = toTarget.magnitude;
+        float movementDot = 1f;
+        if (toTarget.sqrMagnitude > Mathf.Epsilon && obstacleVector.sqrMagnitude > Mathf.Epsilon)
+        {
+            movementDot = Vector3.Dot(toTarget.normalized, obstacleVector.normalized);
+        }
+        if (!Mathf.Approximately(defaultAltitude, targetAltitude))
+        {
+            defaultAltitude = targetAltitude;
+        }
+        bool avoidanceTriggered = movementDot < avoidanceDotThreshold || desiredMovement.magnitude < avoidanceMinMagnitude;
+        float desiredMagnitude = Mathf.Max(avoidanceMinMagnitude, (waypointMagnitude + obstacleMagnitude) * 0.5f);
+        float missingMagnitude = Mathf.Max(0f, desiredMagnitude - desiredMovement.magnitude);
+        dynamicAltitudeOffset = 0f;
+        if (avoidanceTriggered)
+        {
+            dynamicAltitudeOffset = Mathf.Clamp(missingMagnitude + obstacleMagnitude * 0.5f, 0f, maxAvoidanceClimb);
+            try
+            {
+                if (Time.time - lastAvoidanceLogTime >= avoidanceLogInterval)
+                {
+                    Debug.Log($"[PlayerDrone] Vertical avoidance triggered. Offset={dynamicAltitudeOffset:F2}, Dot={movementDot:F2}, ObstMag={obstacleMagnitude:F2}");
+                    lastAvoidanceLogTime = Time.time;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PlayerDrone] Avoidance logging failed: {ex.Message}");
+            }
+        }
         // Height error along Y
-        float heightError = targetAltitude - transform.position.y;
+        float heightError = (defaultAltitude + dynamicAltitudeOffset) - transform.position.y;
         // Horizontal distance error in XZ plane
         Vector3 toTargetXZ = Vector3.ProjectOnPlane(toTarget, Vector3.up);
         float distanceError = toTargetXZ.magnitude - desiredDistance;
@@ -522,6 +565,50 @@ private float lastShotTime = 0f;
             // Reset for the next episode
             ResetEpisode();
         }
+    }
+
+    private Vector3 CalculateObstacleVector()
+    {
+        Collider[] nearby = null;
+        try
+        {
+            nearby = Physics.OverlapSphere(transform.position, viewDistance, obstacleLayers, QueryTriggerInteraction.Ignore);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Obstacle query failed: {ex.Message}");
+            return Vector3.zero;
+        }
+
+        if (nearby == null || nearby.Length == 0)
+        {
+            return Vector3.zero;
+        }
+
+        Vector3 obstacleVector = Vector3.zero;
+        foreach (Collider collider in nearby)
+        {
+            if (collider == null)
+            {
+                continue;
+            }
+            if (collider.attachedRigidbody == rb || collider.transform.IsChildOf(transform))
+            {
+                continue;
+            }
+
+            Vector3 toObstacle = transform.position - collider.bounds.center;
+            float distance = toObstacle.magnitude;
+            if (distance <= Mathf.Epsilon)
+            {
+                continue;
+            }
+
+            float weight = 1f / distance;
+            obstacleVector += toObstacle.normalized * weight;
+        }
+
+        return obstacleVector;
     }
 
 
