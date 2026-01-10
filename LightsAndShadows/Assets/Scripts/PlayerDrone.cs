@@ -354,7 +354,19 @@ public class PlayerDrone : MonoBehaviour
             rollParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
             rollParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
         }
-        InitializeBehaviourNetwork();
+        int behaviourParamCount = InitializeBehaviourNetwork();
+        if (behaviourNN != null)
+        {
+            try
+            {
+                int inputCount = GetBehaviourInputs().Length;
+                behaviourNN.Initialize(inputCount, behaviourParamCount);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"BehaviourNN initialization failed on {gameObject.name}: {e.Message}");
+            }
+        }
         LoadTrainingState();
     }
 
@@ -659,7 +671,7 @@ private float lastShotTime = 0f;
         SaveTrainingState();
     }
 
-    private void InitializeBehaviourNetwork()
+    private int InitializeBehaviourNetwork()
     {
         int paramCount = Mathf.Min(heightParamSets.Length,
                                    Mathf.Min(distanceParamSets.Length,
@@ -668,12 +680,13 @@ private float lastShotTime = 0f;
         if (paramCount <= 0)
         {
             behaviourNN = null;
-            return;
+            return 0;
         }
         if (behaviourNN == null)
         {
             Debug.LogWarning($"BehaviourNN not assigned on {gameObject.name}; persistence will skip weight loading.");
         }
+        return paramCount;
     }
 
     private void LoadTrainingState()

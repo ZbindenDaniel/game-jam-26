@@ -3,7 +3,8 @@ using UnityEngine;
 
 public static class PersistenceManager
 {
-    private const string TrainingDataFolder = "Assets/TrainingData";
+    private const string TrainingDataFolderName = "TrainingData";
+    public static string BasePathOverride;
 
     [System.Serializable]
     private class DronePersistenceData
@@ -70,7 +71,11 @@ public static class PersistenceManager
         string path = GetDronePath(droneId);
         try
         {
-            EnsureTrainingFolderExists();
+            if (!EnsureTrainingFolderExists(out string resolvedPath))
+            {
+                Debug.LogError($"Drone persistence save failed: unable to create training data folder at {resolvedPath} for drone {droneId}.");
+                return false;
+            }
             DronePersistenceData data = new DronePersistenceData
             {
                 heightIndex = heightIndex,
@@ -123,7 +128,8 @@ public static class PersistenceManager
             }
             if (data.weights == null || data.weights.Length != behaviour.InputCount)
             {
-                Debug.LogWarning($"Behaviour persistence load discarded: weight length mismatch at {path} for {behaviourId}.");
+                int actualLength = data.weights == null ? 0 : data.weights.Length;
+                Debug.LogWarning($"Behaviour persistence load discarded: weight length mismatch at {path} for {behaviourId} (expected {behaviour.InputCount}, got {actualLength}).");
                 return false;
             }
 
@@ -154,7 +160,11 @@ public static class PersistenceManager
         string path = GetBehaviourPath(behaviourId);
         try
         {
-            EnsureTrainingFolderExists();
+            if (!EnsureTrainingFolderExists(out string resolvedPath))
+            {
+                Debug.LogError($"Behaviour persistence save failed: unable to create training data folder at {resolvedPath} for {behaviourId}.");
+                return false;
+            }
             BehaviourPersistenceData data = new BehaviourPersistenceData
             {
                 inputCount = behaviour.InputCount,
@@ -175,24 +185,50 @@ public static class PersistenceManager
         }
     }
 
-    private static void EnsureTrainingFolderExists()
+    private static bool EnsureTrainingFolderExists(out string resolvedPath)
     {
-        if (!Directory.Exists(TrainingDataFolder))
+        resolvedPath = GetTrainingDataFolder();
+        try
         {
-            Directory.CreateDirectory(TrainingDataFolder);
+            if (!Directory.Exists(resolvedPath))
+            {
+                Directory.CreateDirectory(resolvedPath);
+            }
+            return true;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Persistence training folder creation failed at {resolvedPath}: {e.Message}");
+            return false;
         }
     }
 
     private static string GetDronePath(string droneId)
     {
-        string safeId = string.IsNullOrWhiteSpace(droneId) ? "drone" : SanitizeFileName(droneId);
-        return Path.Combine(TrainingDataFolder, $"drone_{safeId}_pid.json");
+        string safeId = NormalizeId(droneId, "drone", "drone");
+        return Path.Combine(GetTrainingDataFolder(), $"drone_{safeId}_pid.json");
     }
 
     private static string GetBehaviourPath(string behaviourId)
     {
-        string safeId = string.IsNullOrWhiteSpace(behaviourId) ? "behaviour" : SanitizeFileName(behaviourId);
-        return Path.Combine(TrainingDataFolder, $"behaviour_{safeId}_weights.json");
+        string safeId = NormalizeId(behaviourId, "behaviour", "behaviour");
+        return Path.Combine(GetTrainingDataFolder(), $"behaviour_{safeId}_weights.json");
+    }
+
+    private static string GetTrainingDataFolder()
+    {
+        string basePath = string.IsNullOrWhiteSpace(BasePathOverride) ? Application.persistentDataPath : BasePathOverride;
+        string resolvedPath = Path.Combine(basePath, TrainingDataFolderName);
+        Debug.Log($"Persistence training data path resolved to {resolvedPath}.");
+        return resolvedPath;
+    }
+
+    private static string NormalizeId(string rawId, string fallbackId, string label)
+    {
+        string resolved = string.IsNullOrWhiteSpace(rawId) ? fallbackId : rawId;
+        resolved = resolved.Replace("(Clone)", string.Empty).Trim();
+        Debug.Log($"Persistence resolved {label} id '{resolved}' from '{rawId}'.");
+        return SanitizeFileName(resolved);
     }
 
     private static string SanitizeFileName(string input)
