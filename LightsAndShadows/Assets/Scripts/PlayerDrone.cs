@@ -158,6 +158,8 @@ public class PlayerDrone : MonoBehaviour
     public bool persistMetrics = true;
     /// <summary>Name of the JSON file to write metrics to.</summary>
     public string metricsFilename = "drone_metrics.json";
+    [Tooltip("Log collisions and impact severity for debugging damage signals.")]
+    public bool logCollisionMetrics = false;
 
     // ------------------------------------------------------------------------
     // PID parameter sets and behaviour selector
@@ -236,9 +238,14 @@ public class PlayerDrone : MonoBehaviour
     // Additional metrics: time spent inverted and maximum absolute errors for diagnostics
     private float sumInvertedTime;
     private float sumSpeed;
+    private float sumAngularVelocity;
     private float maxAbsHeightError;
     private float maxAbsDistanceError;
     private float maxAbsYawError;
+    private float maxAbsTiltDeg;
+    private int collisionCount;
+    private float sumImpactSeverity;
+    private float maxImpactSeverity;
     private int runCount;
     private float lastAvgError;
     private readonly List<RunMetric> metrics = new List<RunMetric>();
@@ -516,6 +523,11 @@ private float lastShotTime = 0f;
         // Roll control: compute roll error (drone should remain level)
         float rollErrorRad = Mathf.Asin(Mathf.Clamp(transform.right.y, -1f, 1f));
         float rollCmd = rollPID.controller.Update(rollErrorRad, dt);
+        float tiltDeg = Mathf.Max(Mathf.Abs(currentPitchRad), Mathf.Abs(rollErrorRad)) * Mathf.Rad2Deg;
+        if (tiltDeg > maxAbsTiltDeg)
+        {
+            maxAbsTiltDeg = tiltDeg;
+        }
         // Clamp outputs to avoid saturating thrusters and introducing jitter
         float pitchOut = Mathf.Clamp(pitchCmd, -1f, 1f);
         float rollOut = Mathf.Clamp(rollCmd, -1f, 1f);
@@ -556,9 +568,17 @@ private float lastShotTime = 0f;
         sumSqHeightError += heightError * heightError * dt;
         sumSqDistanceError += distanceError * distanceError * dt;
         sumSqYawError += yawErrorDeg * yawErrorDeg * dt;
-        if (rb != null)
+        try
         {
-            sumSpeed += rb.linearVelocity.magnitude * dt;
+            if (rb != null)
+            {
+                sumSpeed += rb.velocity.magnitude * dt;
+                sumAngularVelocity += rb.angularVelocity.magnitude * dt;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Metric aggregation failed: {ex.Message}");
         }
 
         // If auto tuning is enabled, accumulate gradient information for each PID via the AutoTune wrappers
@@ -693,6 +713,8 @@ private float lastShotTime = 0f;
         float avgDist = simulationTimer > 0f ? sumSqDistanceError / simulationTimer : 0f;
         float avgYaw = simulationTimer > 0f ? sumSqYawError / simulationTimer : 0f;
         float avgSpeed = simulationTimer > 0f ? sumSpeed / simulationTimer : 0f;
+        float avgAngularVelocity = simulationTimer > 0f ? sumAngularVelocity / simulationTimer : 0f;
+        float avgImpactSeverity = collisionCount > 0 ? sumImpactSeverity / collisionCount : 0f;
         // Average proportion of time the drone spent inverted during the episode
         float invertRatio = simulationTimer > 0f ? sumInvertedTime / simulationTimer : 0f;
         int activeProfileIndex = GetActiveGoalProfileIndex();
@@ -711,11 +733,17 @@ private float lastShotTime = 0f;
             avgDistanceError = avgDist,
             avgYawError = avgYaw,
             avgSpeed = avgSpeed,
+            avgAngularVelocity = avgAngularVelocity,
             invertedTime = sumInvertedTime,
             invertRatio = invertRatio,
             maxHeightError = maxAbsHeightError,
             maxDistanceError = maxAbsDistanceError,
             maxYawError = maxAbsYawError,
+            maxTiltDeg = maxAbsTiltDeg,
+            collisionCount = collisionCount,
+            avgImpactSeverity = avgImpactSeverity,
+            maxImpactSeverity = maxImpactSeverity,
+            timeAlive = simulationTimer,
             goalProfileIndex = activeProfileIndex,
             goalProfileName = profile.profileName,
             goalHeightWeight = profile.heightWeight,
@@ -757,6 +785,34 @@ private float lastShotTime = 0f;
         lastAvgError = composite;
     }
 
+    private void OnCollisionEnter(Collision collision)
+    {
+        try
+        {
+            if (collision == null)
+            {
+                return;
+            }
+
+            float impactSeverity = collision.relativeVelocity.magnitude;
+            collisionCount++;
+            sumImpactSeverity += impactSeverity;
+            if (impactSeverity > maxImpactSeverity)
+            {
+                maxImpactSeverity = impactSeverity;
+            }
+
+            if (logCollisionMetrics)
+            {
+                Debug.Log($"[PlayerDrone] Collision recorded on {name}: impact={impactSeverity:F2}, count={collisionCount}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Collision handling failed: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Resets the episode: clears errors, resets physical state and path variables,
     /// and randomises noise offsets so that each new episode explores slightly
@@ -770,9 +826,14 @@ private float lastShotTime = 0f;
         sumSqYawError = 0f;
         sumInvertedTime = 0f;
         sumSpeed = 0f;
+        sumAngularVelocity = 0f;
         maxAbsHeightError = 0f;
         maxAbsDistanceError = 0f;
         maxAbsYawError = 0f;
+        maxAbsTiltDeg = 0f;
+        collisionCount = 0;
+        sumImpactSeverity = 0f;
+        maxImpactSeverity = 0f;
         loggedGoalProfileThisEpisode = false;
         // Reset physical state
         transform.position = initialPosition;
@@ -1293,6 +1354,7 @@ public class RunMetric
     public float avgDistanceError;
     public float avgYawError;
     public float avgSpeed;
+    public float avgAngularVelocity;
     // Inverse orientation metrics: total time drone was inverted and fraction of episode inverted
     public float invertedTime;
     public float invertRatio;
@@ -1300,6 +1362,11 @@ public class RunMetric
     public float maxHeightError;
     public float maxDistanceError;
     public float maxYawError;
+    public float maxTiltDeg;
+    public int collisionCount;
+    public float avgImpactSeverity;
+    public float maxImpactSeverity;
+    public float timeAlive;
     public int goalProfileIndex;
     public string goalProfileName;
     public float goalHeightWeight;
