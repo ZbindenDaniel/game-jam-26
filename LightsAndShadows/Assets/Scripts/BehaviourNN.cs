@@ -31,10 +31,10 @@ using UnityEngine;
 /// </summary>
 public class BehaviourNN : MonoBehaviour
 {
-    private readonly int numInputs;
-    private readonly int paramCount;
-    private readonly float[] weights; // weights[input]
-    private float bias;
+    [SerializeField] private int numInputs = 1;
+    [SerializeField] private int paramCount = 1;
+    [SerializeField] private float[] weights; // weights[input]
+    [SerializeField] private float bias;
 
     public int InputCount => numInputs;
     public int ParamCount => paramCount;
@@ -42,6 +42,11 @@ public class BehaviourNN : MonoBehaviour
     public bool persistWeights = true;
 
     private void Awake()
+    {
+        Initialize(numInputs, paramCount);
+    }
+
+    private void Start()
     {
         LoadWeights();
     }
@@ -57,17 +62,25 @@ public class BehaviourNN : MonoBehaviour
     /// <param name="paramCount">Number of parameter sets available.</param>
     public BehaviourNN(int inputs, int paramCount)
     {
-        this.numInputs = inputs;
+        Initialize(inputs, paramCount);
+    }
+
+    public void Initialize(int inputs, int paramCount)
+    {
+        numInputs = Mathf.Max(1, inputs);
         this.paramCount = Mathf.Max(1, paramCount);
-        weights = new float[numInputs];
-        bias = 0f;
-        // Initialise weights with small random values for diversity.  A
-        // deterministic pseudo‑random sequence ensures reproducibility.
-        System.Random rng = new System.Random(0);
-        for (int j = 0; j < numInputs; j++)
+        if (weights == null || weights.Length != numInputs)
         {
-            // Small values around zero
-            weights[j] = (float)(rng.NextDouble() * 0.2 - 0.1);
+            weights = new float[numInputs];
+            bias = 0f;
+            // Initialise weights with small random values for diversity.  A
+            // deterministic pseudo‑random sequence ensures reproducibility.
+            System.Random rng = new System.Random(0);
+            for (int j = 0; j < numInputs; j++)
+            {
+                // Small values around zero
+                weights[j] = (float)(rng.NextDouble() * 0.2 - 0.1);
+            }
         }
     }
 
@@ -175,6 +188,10 @@ public class BehaviourNN : MonoBehaviour
 
     public float[] GetWeightsCopy()
     {
+        if (weights == null)
+        {
+            return new float[0];
+        }
         float[] copy = new float[weights.Length];
         weights.CopyTo(copy, 0);
         return copy;
@@ -182,8 +199,24 @@ public class BehaviourNN : MonoBehaviour
 
     public bool TryApplyWeights(float[] newWeights, float newBias)
     {
-        if (newWeights == null || newWeights.Length != weights.Length)
+        if (newWeights == null)
         {
+            Debug.LogWarning("BehaviourNN weight apply skipped: no weights supplied.");
+            return false;
+        }
+        if (numInputs <= 0)
+        {
+            Debug.LogWarning($"BehaviourNN weight apply skipped: invalid input count {numInputs}.");
+            return false;
+        }
+        if (newWeights.Length != numInputs)
+        {
+            Debug.LogWarning($"BehaviourNN weight apply skipped: expected {numInputs} weights but received {newWeights.Length}.");
+            return false;
+        }
+        if (weights == null || weights.Length != numInputs)
+        {
+            Debug.LogWarning($"BehaviourNN weight apply skipped: internal weights not initialised (expected {numInputs}, actual {(weights == null ? 0 : weights.Length)}).");
             return false;
         }
         for (int i = 0; i < weights.Length; i++)
