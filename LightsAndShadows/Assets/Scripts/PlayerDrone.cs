@@ -51,6 +51,22 @@ public class PlayerDrone : MonoBehaviour
     public float thrustSmoothing = 0.2f;
 
     // ------------------------------------------------------------------------
+    // Energy and lighting settings
+    // ------------------------------------------------------------------------
+    [Header("Energy Settings")]
+    public float maxEnergy = 100f;
+    public float energy = 100f;
+    public float energyDrainRate = 5f;
+    public float energyRechargeRate = 10f;
+    [Range(0f, 1f)]
+    public float minEnergyThrustMultiplier = 0.2f;
+    public Light sunLight;
+    public LayerMask lightOccluderLayers = ~0;
+    public float lightCheckOffset = 0.1f;
+    public bool logEnergyChanges = false;
+    public float energyLogInterval = 1f;
+
+    // ------------------------------------------------------------------------
     // Target definitions
     // ------------------------------------------------------------------------
     [Header("Target")]
@@ -230,6 +246,11 @@ public class PlayerDrone : MonoBehaviour
     // Idle path generator instance used when no waypoint is assigned
     private CircularPathGenerator idlePath;
     private readonly float[] liftOutputs = new float[4];
+    private float baseMaxLiftThrustPerThruster;
+    private float baseMaxYawThrust;
+    private float lastEnergyLogTime = float.NegativeInfinity;
+    private float energyRatio = 1f;
+    private CanTakeShootingDamage damageReceiver;
 
     // Metric accumulation per episode
     private float sumSqHeightError;
@@ -302,9 +323,17 @@ public class PlayerDrone : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        damageReceiver = GetComponent<CanTakeShootingDamage>();
         initialPosition = transform.position;
         initialRotation = transform.rotation;
         defaultAltitude = targetAltitude;
+        baseMaxLiftThrustPerThruster = maxLiftThrustPerThruster;
+        baseMaxYawThrust = maxYawThrust;
+        if (damageReceiver != null)
+        {
+            maxEnergy = damageReceiver.MaxEnergy;
+            energy = damageReceiver.Energy;
+        }
         if (currentWaypoint != null)
         {
             waypointStartPos = currentWaypoint.position;
@@ -408,6 +437,7 @@ private float lastShotTime = 0f;
         // Always progress the simulation timer even if no waypoint is assigned.
         float dt = Time.fixedDeltaTime;
         simulationTimer += dt;
+        UpdateEnergy(dt);
         // Update the behaviour selector at a slower rate than the physics update.
         behaviourTimer += dt;
         if (behaviourTimer >= behaviourUpdateInterval)
@@ -540,13 +570,15 @@ private float lastShotTime = 0f;
         float br = liftCmd + pitchOut - rollOut;
         float[] targets = { fl, fr, bl, br };
         // Apply smoothing and clamp
+        float energyThrustMultiplier = Mathf.Lerp(minEnergyThrustMultiplier, 1f, energyRatio);
+        float maxLiftThrust = baseMaxLiftThrustPerThruster * energyThrustMultiplier;
         for (int i = 0; i < 4; i++)
         {
             float clamped = Mathf.Clamp01(targets[i]);
             liftOutputs[i] = Mathf.Lerp(liftOutputs[i], clamped, thrustSmoothing);
             // Apply thrust along the thruster’s local up direction
             Transform thruster = (i == 0 ? thrusterFL : i == 1 ? thrusterFR : i == 2 ? thrusterBL : thrusterBR);
-            Vector3 liftForce = thruster.up * liftOutputs[i] * maxLiftThrustPerThruster;
+            Vector3 liftForce = thruster.up * liftOutputs[i] * maxLiftThrust;
             rb.AddForceAtPosition(liftForce, thruster.position, ForceMode.Force);
         }
 
@@ -554,7 +586,8 @@ private float lastShotTime = 0f;
         // local up axis points sideways; using .up here produces a horizontal force to
         // generate a torque about the vertical (Y) axis.  Positive yawCmd pushes in
         // opposite directions on left and right thrusters.
-        float yawForce = Mathf.Clamp(yawCmd, -1f, 1f) * maxYawThrust;
+        float maxYaw = baseMaxYawThrust * energyThrustMultiplier;
+        float yawForce = Mathf.Clamp(yawCmd, -1f, 1f) * maxYaw;
         if (yawThrusterLeft != null)
         {
             rb.AddForceAtPosition(yawThrusterLeft.up * yawForce, yawThrusterLeft.position, ForceMode.Force);
@@ -907,6 +940,97 @@ private float lastShotTime = 0f;
         SaveTrainingState();
     }
 
+    private void UpdateEnergy(float dt)
+    {
+        if (damageReceiver != null)
+        {
+            maxEnergy = damageReceiver.MaxEnergy;
+            energy = damageReceiver.Energy;
+        }
+
+        bool inSunlight = IsInSunlight();
+        float energyDelta = inSunlight ? energyRechargeRate : -energyDrainRate;
+        energy = Mathf.Clamp(energy + energyDelta * dt, 0f, maxEnergy);
+        energyRatio = maxEnergy > Mathf.Epsilon ? Mathf.Clamp01(energy / maxEnergy) : 0f;
+
+        if (damageReceiver != null)
+        {
+            damageReceiver.Energy = energy;
+        }
+
+        if (logEnergyChanges && Time.time - lastEnergyLogTime >= energyLogInterval)
+        {
+            try
+            {
+                Debug.Log($"[PlayerDrone] Energy={energy:F1}/{maxEnergy:F1} (sunlit={inSunlight})");
+                lastEnergyLogTime = Time.time;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PlayerDrone] Energy logging failed: {ex.Message}");
+            }
+        }
+    }
+
+    private bool IsInSunlight()
+    {
+        if (sunLight == null || !sunLight.enabled)
+        {
+            return false;
+        }
+
+        Vector3 origin = transform.position + Vector3.up * lightCheckOffset;
+        Vector3 direction;
+        float maxDistance;
+        if (sunLight.type == LightType.Directional)
+        {
+            direction = -sunLight.transform.forward;
+            maxDistance = Mathf.Infinity;
+        }
+        else
+        {
+            Vector3 toLight = sunLight.transform.position - origin;
+            maxDistance = toLight.magnitude;
+            if (maxDistance <= Mathf.Epsilon)
+            {
+                return true;
+            }
+            direction = toLight / maxDistance;
+        }
+
+        try
+        {
+            RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxDistance, lightOccluderLayers, QueryTriggerInteraction.Ignore);
+            if (hits == null || hits.Length == 0)
+            {
+                return true;
+            }
+
+            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider == null)
+                {
+                    continue;
+                }
+
+                if (hit.collider.attachedRigidbody == rb || hit.collider.transform.IsChildOf(transform))
+                {
+                    continue;
+                }
+
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Light check failed: {ex.Message}");
+            return false;
+        }
+
+        return true;
+    }
+
     private int InitializeBehaviourNetwork()
     {
         int paramCount = Mathf.Min(heightParamSets.Length,
@@ -1204,7 +1328,7 @@ private float lastShotTime = 0f;
     /// <summary>
     /// Computes the input vector for the behaviour selection neural network.  The
     /// features included here provide a high‑level description of the
-    /// environment and the drone's state: current health (placeholder), velocity,
+    /// environment and the drone's state: current energy, velocity,
     /// height, waypoint active flag, waypoint distance, and obstacle counts
     /// (below, same/above, forward FOV).  Additional inputs can easily be
     /// added here to enrich the behaviour selection.
@@ -1212,8 +1336,7 @@ private float lastShotTime = 0f;
     /// <returns>Array of input values matching the number of inputs expected by the neural network.</returns>
     private float[] GetBehaviourInputs()
     {
-        // Placeholder health: not implemented, so always 1
-        float health = 1f;
+        float energyPercent = maxEnergy > Mathf.Epsilon ? Mathf.Clamp01(energy / maxEnergy) : 0f;
         float velocity = rb != null ? rb.linearVelocity.magnitude : 0f;
 
         // Waypoint active flag: 1 when a waypoint is set, 0 in idle mode
@@ -1231,7 +1354,7 @@ private float lastShotTime = 0f;
         {
             try
             {
-                // Debug.Log($"Behaviour inputs ({inputs.Length}): health={health:F2} bias={bias:F2} waypointActive={waypointActive:F0} obstacles={obstacleCount:F0} height={height:F2}");
+                // Debug.Log($"Behaviour inputs ({inputs.Length}): energy={energyPercent:F2} bias={bias:F2} waypointActive={waypointActive:F0} obstacles={obstacleCount:F0} height={height:F2}");
                 lastBehaviourInputLogTime = Time.time;
             }
             catch (System.Exception e)
@@ -1242,7 +1365,7 @@ private float lastShotTime = 0f;
         
         return new float[]
         {
-            health,
+            energyPercent,
             velocity,
             height,
             waypointActive,
