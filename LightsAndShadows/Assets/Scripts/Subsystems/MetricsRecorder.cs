@@ -109,6 +109,26 @@ public class MetricsRecorder : MonoBehaviour
         int activeProfileIndex = GetActiveGoalProfileIndex();
         DroneGoalProfile profile = GetActiveGoalProfile();
         LogGoalProfileIfNeeded(profile);
+        float obstacleMagnitude = 0f;
+        float obstacleAlignment = 0f;
+        try
+        {
+            if (behaviourSelector != null)
+            {
+                Vector3 obstacleVector = behaviourSelector.CalculateObstacleVector(transform);
+                obstacleMagnitude = obstacleVector.magnitude;
+                Transform waypoint = behaviourSelector.CurrentWaypoint;
+                Vector3 toTarget = waypoint != null ? waypoint.position - transform.position : Vector3.zero;
+                if (obstacleMagnitude > Mathf.Epsilon && toTarget.sqrMagnitude > Mathf.Epsilon)
+                {
+                    obstacleAlignment = Vector3.Dot(toTarget.normalized, obstacleVector.normalized);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Obstacle metric sampling failed: {ex.Message}");
+        }
 
         float composite = (avgHeight * profile.heightWeight)
             + (avgDist * profile.distanceWeight)
@@ -148,6 +168,8 @@ public class MetricsRecorder : MonoBehaviour
             goalYawWeight = profile.yawWeight,
             goalStabilityWeight = profile.stabilityWeight,
             goalSpeedWeight = profile.speedWeight,
+            obstacleMagnitude = obstacleMagnitude,
+            obstacleAlignment = obstacleAlignment,
             heightKp = heightPID != null ? heightPID.controller.Kp : 0f,
             heightKi = heightPID != null ? heightPID.controller.Ki : 0f,
             heightKd = heightPID != null ? heightPID.controller.Kd : 0f,

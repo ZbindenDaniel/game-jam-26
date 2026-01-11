@@ -27,6 +27,8 @@ public class RunMetric
     public float goalYawWeight;
     public float goalStabilityWeight;
     public float goalSpeedWeight;
+    public float obstacleMagnitude;
+    public float obstacleAlignment;
     public float heightKp, heightKi, heightKd;
     public float distanceKp, distanceKi, distanceKd;
     public float pitchKp, pitchKi, pitchKd;
