@@ -27,6 +27,7 @@ public class BehaviourSelector : MonoBehaviour
     [Header("Behaviour Input Debugging")]
     [SerializeField] private bool logBehaviourInputs = false;
     [SerializeField] private float behaviourInputLogInterval = 1f;
+    [SerializeField] private float obstacleFeatureLogInterval = 2f;
 
     [Header("PID Optimisation Flags")]
     [SerializeField] private bool optimiseHeightPID = false;
@@ -53,6 +54,7 @@ public class BehaviourSelector : MonoBehaviour
 
     private float behaviourTimer = 0f;
     private float lastBehaviourInputLogTime = float.NegativeInfinity;
+    private float lastObstacleFeatureLogTime = float.NegativeInfinity;
     private int currentHeightSetIndex = 0;
     private int currentDistanceSetIndex = 0;
     private int currentPitchSetIndex = 0;
@@ -501,6 +503,28 @@ public class BehaviourSelector : MonoBehaviour
         int obstaclesSameOrAbove;
         int obstaclesInFov;
         ComputeObstaclePerception(out obstaclesBelow, out obstaclesSameOrAbove, out obstaclesInFov);
+        float obstacleMagnitude = 0f;
+        float obstacleAlignment = 0f;
+        try
+        {
+            Vector3 obstacleVector = CalculateObstacleVector(transform);
+            obstacleMagnitude = obstacleVector.magnitude;
+            Vector3 toTarget = currentWaypoint != null
+                ? currentWaypoint.position - transform.position
+                : Vector3.zero;
+            if (obstacleMagnitude > Mathf.Epsilon && toTarget.sqrMagnitude > Mathf.Epsilon)
+            {
+                obstacleAlignment = Vector3.Dot(toTarget.normalized, obstacleVector.normalized);
+            }
+        }
+        catch (Exception e)
+        {
+            if ((Time.time - lastObstacleFeatureLogTime) >= obstacleFeatureLogInterval)
+            {
+                lastObstacleFeatureLogTime = Time.time;
+                Debug.LogWarning($"[PlayerDrone] Obstacle feature sampling failed for {name}: {e.Message}");
+            }
+        }
 
         if (logBehaviourInputs && (Time.time - lastBehaviourInputLogTime) >= behaviourInputLogInterval)
         {
@@ -523,7 +547,9 @@ public class BehaviourSelector : MonoBehaviour
             waypointDistance,
             obstaclesBelow,
             obstaclesSameOrAbove,
-            obstaclesInFov
+            obstaclesInFov,
+            obstacleMagnitude,
+            obstacleAlignment
         };
     }
 
