@@ -114,6 +114,7 @@ public class PlayerDrone : MonoBehaviour
     private float defaultAltitude;
     private float dynamicAltitudeOffset;
     private float lastAvoidanceLogTime = float.NegativeInfinity;
+    private float lastAvoidancePidLogTime = float.NegativeInfinity;
 
     // ------------------------------------------------------------------------
     // Unity lifecycle methods
@@ -225,14 +226,44 @@ public class PlayerDrone : MonoBehaviour
 
         // Compute control errors
         Vector3 toTarget = targetPos - transform.position;
-        Vector3 obstacleVector = behaviourSelector != null ? behaviourSelector.CalculateObstacleVector(transform) : Vector3.zero;
-        Vector3 desiredMovement = (toTarget + obstacleVector) * 0.5f;
+        Vector3 obstacleVector = Vector3.zero;
+        try
+        {
+            obstacleVector = behaviourSelector != null ? behaviourSelector.CalculateObstacleVector(transform) : Vector3.zero;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Obstacle vector calculation failed: {ex.Message}");
+        }
         float obstacleMagnitude = obstacleVector.magnitude;
+        Vector3 normalizedObstacle = obstacleMagnitude > Mathf.Epsilon ? obstacleVector / obstacleMagnitude : Vector3.zero;
+        AutoTunePID obstacleWeightPID = behaviourSelector != null ? behaviourSelector.ObstacleWeightPID : null;
+        AutoTunePID obstacleYawPID = behaviourSelector != null ? behaviourSelector.ObstacleYawPID : null;
+        AutoTunePID obstaclePitchPID = behaviourSelector != null ? behaviourSelector.ObstaclePitchPID : null;
+        float obstacleWeightError = obstacleMagnitude;
+        float obstacleYawError = normalizedObstacle.sqrMagnitude > Mathf.Epsilon
+            ? Vector3.SignedAngle(transform.forward, normalizedObstacle, Vector3.up) * Mathf.Deg2Rad
+            : 0f;
+        float obstaclePitchError = normalizedObstacle.sqrMagnitude > Mathf.Epsilon
+            ? Vector3.SignedAngle(transform.forward, normalizedObstacle, transform.right) * Mathf.Deg2Rad
+            : 0f;
+        float obstacleWeightOutput = obstacleWeightPID != null ? obstacleWeightPID.controller.Update(obstacleWeightError, dt) : 0f;
+        float obstacleYawOutput = obstacleYawPID != null ? obstacleYawPID.controller.Update(obstacleYawError, dt) : 0f;
+        float obstaclePitchOutput = obstaclePitchPID != null ? obstaclePitchPID.controller.Update(obstaclePitchError, dt) : 0f;
+        float obstacleWeightScale = Mathf.Clamp(obstacleWeightOutput, -1f, 1f);
+        Vector3 adjustedObstacle = Vector3.zero;
+        if (normalizedObstacle.sqrMagnitude > Mathf.Epsilon)
+        {
+            Quaternion yawRotation = Quaternion.AngleAxis(obstacleYawOutput * Mathf.Rad2Deg, Vector3.up);
+            Quaternion pitchRotation = Quaternion.AngleAxis(obstaclePitchOutput * Mathf.Rad2Deg, transform.right);
+            adjustedObstacle = yawRotation * pitchRotation * normalizedObstacle * obstacleMagnitude * obstacleWeightScale;
+        }
+        Vector3 desiredMovement = (toTarget + adjustedObstacle) * 0.5f;
         float waypointMagnitude = toTarget.magnitude;
         float movementDot = 1f;
-        if (toTarget.sqrMagnitude > Mathf.Epsilon && obstacleVector.sqrMagnitude > Mathf.Epsilon)
+        if (toTarget.sqrMagnitude > Mathf.Epsilon && adjustedObstacle.sqrMagnitude > Mathf.Epsilon)
         {
-            movementDot = Vector3.Dot(toTarget.normalized, obstacleVector.normalized);
+            movementDot = Vector3.Dot(toTarget.normalized, adjustedObstacle.normalized);
         }
         if (!Mathf.Approximately(defaultAltitude, targetAltitude))
         {
@@ -258,6 +289,18 @@ public class PlayerDrone : MonoBehaviour
                 Debug.LogWarning($"[PlayerDrone] Avoidance logging failed: {ex.Message}");
             }
         }
+        try
+        {
+            if (Time.time - lastAvoidancePidLogTime >= avoidanceLogInterval)
+            {
+                Debug.Log($"[PlayerDrone] Avoidance PID outputs: weight={obstacleWeightOutput:F2}, yaw={obstacleYawOutput:F2}, pitch={obstaclePitchOutput:F2}, vector={adjustedObstacle}");
+                lastAvoidancePidLogTime = Time.time;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Avoidance PID logging failed: {ex.Message}");
+        }
         // Height error along Y
         float heightError = (defaultAltitude + dynamicAltitudeOffset) - transform.position.y;
         // Horizontal distance error in XZ plane
@@ -272,7 +315,7 @@ public class PlayerDrone : MonoBehaviour
         AutoTunePID pitchPID = behaviourSelector != null ? behaviourSelector.PitchPID : null;
         AutoTunePID yawPID = behaviourSelector != null ? behaviourSelector.YawPID : null;
         AutoTunePID rollPID = behaviourSelector != null ? behaviourSelector.RollPID : null;
-        if (heightPID == null || distancePID == null || pitchPID == null || yawPID == null || rollPID == null)
+        if (heightPID == null || distancePID == null || pitchPID == null || yawPID == null || rollPID == null || obstacleWeightPID == null || obstacleYawPID == null || obstaclePitchPID == null)
         {
             return;
         }
@@ -341,7 +384,7 @@ public class PlayerDrone : MonoBehaviour
 
         if (behaviourSelector != null)
         {
-            behaviourSelector.AccumulateGradients(heightError, distanceError, pitchError, yawErrorDeg * Mathf.Deg2Rad, rollErrorRad, dt);
+            behaviourSelector.AccumulateGradients(heightError, distanceError, pitchError, yawErrorDeg * Mathf.Deg2Rad, rollErrorRad, obstacleWeightError, obstacleYawError, obstaclePitchError, dt);
         }
 
         // End of episode: record metrics and reset

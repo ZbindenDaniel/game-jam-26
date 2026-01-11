@@ -15,6 +15,9 @@ public class BehaviourSelector : MonoBehaviour
     [SerializeField] private PIDGains[] pitchParamSets;
     [SerializeField] private PIDGains[] yawParamSets;
     [SerializeField] private PIDGains[] rollParamSets;
+    [SerializeField] private PIDGains[] obstacleWeightParamSets;
+    [SerializeField] private PIDGains[] obstacleYawParamSets;
+    [SerializeField] private PIDGains[] obstaclePitchParamSets;
 
     [Header("Behaviour Selection Settings")]
     [SerializeField] private int behaviourtrainingIndex = 0;
@@ -35,6 +38,9 @@ public class BehaviourSelector : MonoBehaviour
     [SerializeField] private bool optimisePitchPID = false;
     [SerializeField] private bool optimiseYawPID = false;
     [SerializeField] private bool optimiseRollPID = false;
+    [SerializeField] private bool optimiseObstacleWeightPID = false;
+    [SerializeField] private bool optimiseObstacleYawPID = false;
+    [SerializeField] private bool optimiseObstaclePitchPID = false;
 
     [Header("Auto Tuning Settings")]
     [SerializeField] private bool enableAutoTuning = false;
@@ -51,6 +57,9 @@ public class BehaviourSelector : MonoBehaviour
     [SerializeField] private AutoTunePID pitchPID;
     [SerializeField] private AutoTunePID yawPID;
     [SerializeField] private AutoTunePID rollPID;
+    [SerializeField] private AutoTunePID obstacleWeightPID;
+    [SerializeField] private AutoTunePID obstacleYawPID;
+    [SerializeField] private AutoTunePID obstaclePitchPID;
 
     private float behaviourTimer = 0f;
     private float lastBehaviourInputLogTime = float.NegativeInfinity;
@@ -60,6 +69,9 @@ public class BehaviourSelector : MonoBehaviour
     private int currentPitchSetIndex = 0;
     private int currentYawSetIndex = 0;
     private int currentRollSetIndex = 0;
+    private int currentObstacleWeightSetIndex = 0;
+    private int currentObstacleYawSetIndex = 0;
+    private int currentObstaclePitchSetIndex = 0;
     private readonly List<float[]> behaviourTrainingInputs = new List<float[]>();
     private readonly List<int> behaviourTrainingTargets = new List<int>();
     private int episodesSinceBehaviourTraining = 0;
@@ -69,6 +81,9 @@ public class BehaviourSelector : MonoBehaviour
     public AutoTunePID PitchPID => pitchPID;
     public AutoTunePID YawPID => yawPID;
     public AutoTunePID RollPID => rollPID;
+    public AutoTunePID ObstacleWeightPID => obstacleWeightPID;
+    public AutoTunePID ObstacleYawPID => obstacleYawPID;
+    public AutoTunePID ObstaclePitchPID => obstaclePitchPID;
     public float BehaviourUpdateInterval => behaviourUpdateInterval;
     public float ViewAngle => viewAngle;
     public float ViewDistance => viewDistance;
@@ -91,12 +106,18 @@ public class BehaviourSelector : MonoBehaviour
         if (pitchPID == null) pitchPID = new AutoTunePID();
         if (yawPID == null) yawPID = new AutoTunePID();
         if (rollPID == null) rollPID = new AutoTunePID();
+        if (obstacleWeightPID == null) obstacleWeightPID = new AutoTunePID();
+        if (obstacleYawPID == null) obstacleYawPID = new AutoTunePID();
+        if (obstaclePitchPID == null) obstaclePitchPID = new AutoTunePID();
 
         heightPID.optimize = optimiseHeightPID;
         distancePID.optimize = optimiseDistancePID;
         pitchPID.optimize = optimisePitchPID;
         yawPID.optimize = optimiseYawPID;
         rollPID.optimize = optimiseRollPID;
+        obstacleWeightPID.optimize = optimiseObstacleWeightPID;
+        obstacleYawPID.optimize = optimiseObstacleYawPID;
+        obstaclePitchPID.optimize = optimiseObstaclePitchPID;
 
         InitializeDefaultParamSets();
         int behaviourParamCount = InitializeBehaviourNetwork();
@@ -125,7 +146,7 @@ public class BehaviourSelector : MonoBehaviour
         }
     }
 
-    public void AccumulateGradients(float heightError, float distanceError, float pitchError, float yawError, float rollError, float dt)
+    public void AccumulateGradients(float heightError, float distanceError, float pitchError, float yawError, float rollError, float obstacleWeightError, float obstacleYawError, float obstaclePitchError, float dt)
     {
         if (!enableAutoTuning)
         {
@@ -152,6 +173,18 @@ public class BehaviourSelector : MonoBehaviour
         {
             rollPID.AccumulateGradients(rollError, dt);
         }
+        if (obstacleWeightPID != null && obstacleWeightPID.optimize)
+        {
+            obstacleWeightPID.AccumulateGradients(obstacleWeightError, dt);
+        }
+        if (obstacleYawPID != null && obstacleYawPID.optimize)
+        {
+            obstacleYawPID.AccumulateGradients(obstacleYawError, dt);
+        }
+        if (obstaclePitchPID != null && obstaclePitchPID.optimize)
+        {
+            obstaclePitchPID.AccumulateGradients(obstaclePitchError, dt);
+        }
     }
 
     public void ResetForEpisode()
@@ -167,6 +200,9 @@ public class BehaviourSelector : MonoBehaviour
         pitchPID?.ResetTuning();
         yawPID?.ResetTuning();
         rollPID?.ResetTuning();
+        obstacleWeightPID?.ResetTuning();
+        obstacleYawPID?.ResetTuning();
+        obstaclePitchPID?.ResetTuning();
     }
 
     public void ApplyAutoTuning(float episodeDuration)
@@ -205,6 +241,24 @@ public class BehaviourSelector : MonoBehaviour
         {
             int idx = Mathf.Clamp(currentRollSetIndex, 0, rollParamSets.Length - 1);
             rollParamSets[idx] = new PIDGains(rollPID.controller.Kp, rollPID.controller.Ki, rollPID.controller.Kd);
+        }
+        obstacleWeightPID.ApplyTuning(episodeDuration, learningRate);
+        if (obstacleWeightParamSets != null && obstacleWeightParamSets.Length > 0)
+        {
+            int idx = Mathf.Clamp(currentObstacleWeightSetIndex, 0, obstacleWeightParamSets.Length - 1);
+            obstacleWeightParamSets[idx] = new PIDGains(obstacleWeightPID.controller.Kp, obstacleWeightPID.controller.Ki, obstacleWeightPID.controller.Kd);
+        }
+        obstacleYawPID.ApplyTuning(episodeDuration, learningRate);
+        if (obstacleYawParamSets != null && obstacleYawParamSets.Length > 0)
+        {
+            int idx = Mathf.Clamp(currentObstacleYawSetIndex, 0, obstacleYawParamSets.Length - 1);
+            obstacleYawParamSets[idx] = new PIDGains(obstacleYawPID.controller.Kp, obstacleYawPID.controller.Ki, obstacleYawPID.controller.Kd);
+        }
+        obstaclePitchPID.ApplyTuning(episodeDuration, learningRate);
+        if (obstaclePitchParamSets != null && obstaclePitchParamSets.Length > 0)
+        {
+            int idx = Mathf.Clamp(currentObstaclePitchSetIndex, 0, obstaclePitchParamSets.Length - 1);
+            obstaclePitchParamSets[idx] = new PIDGains(obstaclePitchPID.controller.Kp, obstaclePitchPID.controller.Ki, obstaclePitchPID.controller.Kd);
         }
     }
 
@@ -342,6 +396,30 @@ public class BehaviourSelector : MonoBehaviour
             rollParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
             rollParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
         }
+        if (obstacleWeightParamSets == null || obstacleWeightParamSets.Length == 0)
+        {
+            obstacleWeightParamSets = new PIDGains[defaultSetCount];
+            var def = new PIDGains(obstacleWeightPID.controller.Kp, obstacleWeightPID.controller.Ki, obstacleWeightPID.controller.Kd);
+            obstacleWeightParamSets[0] = def;
+            obstacleWeightParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
+            obstacleWeightParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
+        }
+        if (obstacleYawParamSets == null || obstacleYawParamSets.Length == 0)
+        {
+            obstacleYawParamSets = new PIDGains[defaultSetCount];
+            var def = new PIDGains(obstacleYawPID.controller.Kp, obstacleYawPID.controller.Ki, obstacleYawPID.controller.Kd);
+            obstacleYawParamSets[0] = def;
+            obstacleYawParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
+            obstacleYawParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
+        }
+        if (obstaclePitchParamSets == null || obstaclePitchParamSets.Length == 0)
+        {
+            obstaclePitchParamSets = new PIDGains[defaultSetCount];
+            var def = new PIDGains(obstaclePitchPID.controller.Kp, obstaclePitchPID.controller.Ki, obstaclePitchPID.controller.Kd);
+            obstaclePitchParamSets[0] = def;
+            obstaclePitchParamSets[1] = new PIDGains(def.Kp * 0.5f, def.Ki, def.Kd * 0.5f);
+            obstaclePitchParamSets[2] = new PIDGains(def.Kp * 2f, def.Ki, def.Kd * 2f);
+        }
     }
 
     private int InitializeBehaviourNetwork()
@@ -349,7 +427,10 @@ public class BehaviourSelector : MonoBehaviour
         int paramCount = Mathf.Min(heightParamSets.Length,
             Mathf.Min(distanceParamSets.Length,
                 Mathf.Min(pitchParamSets.Length,
-                    Mathf.Min(yawParamSets.Length, rollParamSets.Length))));
+                    Mathf.Min(yawParamSets.Length,
+                        Mathf.Min(rollParamSets.Length,
+                            Mathf.Min(obstacleWeightParamSets.Length,
+                                Mathf.Min(obstacleYawParamSets.Length, obstaclePitchParamSets.Length)))))));
         if (paramCount <= 0)
         {
             behaviourNN = null;
@@ -365,25 +446,28 @@ public class BehaviourSelector : MonoBehaviour
     private void LoadTrainingState()
     {
         string droneId = gameObject.name;
-        if (PersistenceManager.TryLoadDroneIndices(droneId, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex))
+        if (PersistenceManager.TryLoadDroneIndices(droneId, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex, out int obstacleWeightIndex, out int obstacleYawIndex, out int obstaclePitchIndex))
         {
-            ApplyPersistedParameterSets(heightIndex, distanceIndex, pitchIndex, yawIndex, rollIndex);
+            ApplyPersistedParameterSets(heightIndex, distanceIndex, pitchIndex, yawIndex, rollIndex, obstacleWeightIndex, obstacleYawIndex, obstaclePitchIndex);
         }
     }
 
     private void SaveTrainingState()
     {
         string droneId = gameObject.name;
-        PersistenceManager.TrySaveDroneIndices(droneId, currentHeightSetIndex, currentDistanceSetIndex, currentPitchSetIndex, currentYawSetIndex, currentRollSetIndex);
+        PersistenceManager.TrySaveDroneIndices(droneId, currentHeightSetIndex, currentDistanceSetIndex, currentPitchSetIndex, currentYawSetIndex, currentRollSetIndex, currentObstacleWeightSetIndex, currentObstacleYawSetIndex, currentObstaclePitchSetIndex);
     }
 
-    private void ApplyPersistedParameterSets(int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex)
+    private void ApplyPersistedParameterSets(int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex, int obstacleWeightIndex, int obstacleYawIndex, int obstaclePitchIndex)
     {
         ApplyPIDIndex(heightParamSets, heightPID, ref currentHeightSetIndex, heightIndex);
         ApplyPIDIndex(distanceParamSets, distancePID, ref currentDistanceSetIndex, distanceIndex);
         ApplyPIDIndex(pitchParamSets, pitchPID, ref currentPitchSetIndex, pitchIndex);
         ApplyPIDIndex(yawParamSets, yawPID, ref currentYawSetIndex, yawIndex);
         ApplyPIDIndex(rollParamSets, rollPID, ref currentRollSetIndex, rollIndex);
+        ApplyPIDIndex(obstacleWeightParamSets, obstacleWeightPID, ref currentObstacleWeightSetIndex, obstacleWeightIndex);
+        ApplyPIDIndex(obstacleYawParamSets, obstacleYawPID, ref currentObstacleYawSetIndex, obstacleYawIndex);
+        ApplyPIDIndex(obstaclePitchParamSets, obstaclePitchPID, ref currentObstaclePitchSetIndex, obstaclePitchIndex);
     }
 
     private void ApplyPIDIndex(PIDGains[] sets, AutoTunePID pid, ref int currentIndex, int desiredIndex)
@@ -423,6 +507,9 @@ public class BehaviourSelector : MonoBehaviour
         int countPitch = pitchParamSets != null ? pitchParamSets.Length : 0;
         int countYaw = yawParamSets != null ? yawParamSets.Length : 0;
         int countRoll = rollParamSets != null ? rollParamSets.Length : 0;
+        int countObstacleWeight = obstacleWeightParamSets != null ? obstacleWeightParamSets.Length : 0;
+        int countObstacleYaw = obstacleYawParamSets != null ? obstacleYawParamSets.Length : 0;
+        int countObstaclePitch = obstaclePitchParamSets != null ? obstaclePitchParamSets.Length : 0;
         if (countHeight > 0)
         {
             int idx = Mathf.Clamp(behaviourIndex, 0, countHeight - 1);
@@ -467,6 +554,33 @@ public class BehaviourSelector : MonoBehaviour
             rollPID.controller.Kp = g.Kp;
             rollPID.controller.Ki = g.Ki;
             rollPID.controller.Kd = g.Kd;
+        }
+        if (countObstacleWeight > 0)
+        {
+            int idx = Mathf.Clamp(behaviourIndex, 0, countObstacleWeight - 1);
+            currentObstacleWeightSetIndex = idx;
+            var g = obstacleWeightParamSets[idx];
+            obstacleWeightPID.controller.Kp = g.Kp;
+            obstacleWeightPID.controller.Ki = g.Ki;
+            obstacleWeightPID.controller.Kd = g.Kd;
+        }
+        if (countObstacleYaw > 0)
+        {
+            int idx = Mathf.Clamp(behaviourIndex, 0, countObstacleYaw - 1);
+            currentObstacleYawSetIndex = idx;
+            var g = obstacleYawParamSets[idx];
+            obstacleYawPID.controller.Kp = g.Kp;
+            obstacleYawPID.controller.Ki = g.Ki;
+            obstacleYawPID.controller.Kd = g.Kd;
+        }
+        if (countObstaclePitch > 0)
+        {
+            int idx = Mathf.Clamp(behaviourIndex, 0, countObstaclePitch - 1);
+            currentObstaclePitchSetIndex = idx;
+            var g = obstaclePitchParamSets[idx];
+            obstaclePitchPID.controller.Kp = g.Kp;
+            obstaclePitchPID.controller.Ki = g.Ki;
+            obstaclePitchPID.controller.Kd = g.Kd;
         }
 
         if (enableBehaviourTraining)

@@ -14,6 +14,9 @@ public static class PersistenceManager
         public int pitchIndex;
         public int yawIndex;
         public int rollIndex;
+        public int obstacleWeightIndex;
+        public int obstacleYawIndex;
+        public int obstaclePitchIndex;
     }
 
     [System.Serializable]
@@ -25,13 +28,16 @@ public static class PersistenceManager
         public float bias;
     }
 
-    public static bool TryLoadDroneIndices(string droneId, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex)
+    public static bool TryLoadDroneIndices(string droneId, out int heightIndex, out int distanceIndex, out int pitchIndex, out int yawIndex, out int rollIndex, out int obstacleWeightIndex, out int obstacleYawIndex, out int obstaclePitchIndex)
     {
         heightIndex = 0;
         distanceIndex = 0;
         pitchIndex = 0;
         yawIndex = 0;
         rollIndex = 0;
+        obstacleWeightIndex = 0;
+        obstacleYawIndex = 0;
+        obstaclePitchIndex = 0;
 
         string path = GetDronePath(droneId);
         if (!File.Exists(path))
@@ -55,6 +61,9 @@ public static class PersistenceManager
             pitchIndex = data.pitchIndex;
             yawIndex = data.yawIndex;
             rollIndex = data.rollIndex;
+            obstacleWeightIndex = data.obstacleWeightIndex;
+            obstacleYawIndex = data.obstacleYawIndex;
+            obstaclePitchIndex = data.obstaclePitchIndex;
 
             Debug.Log($"Drone persistence load succeeded at {path} for drone {droneId}.");
             return true;
@@ -66,7 +75,7 @@ public static class PersistenceManager
         }
     }
 
-    public static bool TrySaveDroneIndices(string droneId, int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex)
+    public static bool TrySaveDroneIndices(string droneId, int heightIndex, int distanceIndex, int pitchIndex, int yawIndex, int rollIndex, int obstacleWeightIndex, int obstacleYawIndex, int obstaclePitchIndex)
     {
         string path = GetDronePath(droneId);
         try
@@ -82,7 +91,10 @@ public static class PersistenceManager
                 distanceIndex = distanceIndex,
                 pitchIndex = pitchIndex,
                 yawIndex = yawIndex,
-                rollIndex = rollIndex
+                rollIndex = rollIndex,
+                obstacleWeightIndex = obstacleWeightIndex,
+                obstacleYawIndex = obstacleYawIndex,
+                obstaclePitchIndex = obstaclePitchIndex
             };
 
             string json = JsonUtility.ToJson(data, true);
