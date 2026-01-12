@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class BehaviourSelector : MonoBehaviour
@@ -20,9 +19,7 @@ public class BehaviourSelector : MonoBehaviour
     [SerializeField] private PIDGains[] obstaclePitchParamSets;
 
     [Header("Behaviour Selection Settings")]
-    [SerializeField] private int behaviourtrainingIndex = 0;
-    [SerializeField] private float behaviourUpdateInterval = 0.5f;
-    [SerializeField] private BehaviourNN behaviourNN;
+    [SerializeField] private int behaviourStaticIndex = 0;
     [SerializeField] private LayerMask obstacleLayers = ~0;
     [SerializeField] private float viewAngle = 15f;
     [SerializeField] private float viewDistance = 45f;
@@ -46,12 +43,6 @@ public class BehaviourSelector : MonoBehaviour
     [SerializeField] private bool enableAutoTuning = false;
     [SerializeField] private float learningRate = 0.001f;
 
-    [Header("Behaviour NN Training")]
-    [SerializeField] private bool enableBehaviourTraining = false;
-    [SerializeField] private int behaviourTrainingInterval = 1;
-    [SerializeField] private float behaviourLearningRate = 0.01f;
-    [SerializeField] private int behaviourEpochs = 1;
-
     [SerializeField] private AutoTunePID heightPID;
     [SerializeField] private AutoTunePID distancePID;
     [SerializeField] private AutoTunePID pitchPID;
@@ -61,7 +52,6 @@ public class BehaviourSelector : MonoBehaviour
     [SerializeField] private AutoTunePID obstacleYawPID;
     [SerializeField] private AutoTunePID obstaclePitchPID;
 
-    private float behaviourTimer = 0f;
     private float lastBehaviourInputLogTime = float.NegativeInfinity;
     private float lastObstacleFeatureLogTime = float.NegativeInfinity;
     private int currentHeightSetIndex = 0;
@@ -72,9 +62,7 @@ public class BehaviourSelector : MonoBehaviour
     private int currentObstacleWeightSetIndex = 0;
     private int currentObstacleYawSetIndex = 0;
     private int currentObstaclePitchSetIndex = 0;
-    private readonly List<float[]> behaviourTrainingInputs = new List<float[]>();
-    private readonly List<int> behaviourTrainingTargets = new List<int>();
-    private int episodesSinceBehaviourTraining = 0;
+    private bool loggedStaticBehaviourSet = false;
 
     public AutoTunePID HeightPID => heightPID;
     public AutoTunePID DistancePID => distancePID;
@@ -84,7 +72,6 @@ public class BehaviourSelector : MonoBehaviour
     public AutoTunePID ObstacleWeightPID => obstacleWeightPID;
     public AutoTunePID ObstacleYawPID => obstacleYawPID;
     public AutoTunePID ObstaclePitchPID => obstaclePitchPID;
-    public float BehaviourUpdateInterval => behaviourUpdateInterval;
     public float ViewAngle => viewAngle;
     public float ViewDistance => viewDistance;
     public Transform CurrentWaypoint => currentWaypoint;
@@ -120,30 +107,11 @@ public class BehaviourSelector : MonoBehaviour
         obstaclePitchPID.optimize = optimiseObstaclePitchPID;
 
         InitializeDefaultParamSets();
-        int behaviourParamCount = InitializeBehaviourNetwork();
-        if (behaviourNN != null)
-        {
-            try
-            {
-                int inputCount = GetBehaviourInputs().Length;
-                behaviourNN.Initialize(inputCount, behaviourParamCount);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[PlayerDrone] BehaviourNN initialization failed on {gameObject.name}: {e.Message}");
-            }
-        }
         LoadTrainingState();
     }
 
     public void TickBehaviour(float dt)
     {
-        behaviourTimer += dt;
-        if (behaviourTimer >= behaviourUpdateInterval)
-        {
-            ApplyBehaviourParameterSets();
-            behaviourTimer = 0f;
-        }
     }
 
     public void AccumulateGradients(float heightError, float distanceError, float pitchError, float yawError, float rollError, float obstacleWeightError, float obstacleYawError, float obstaclePitchError, float dt)
@@ -189,7 +157,6 @@ public class BehaviourSelector : MonoBehaviour
 
     public void ResetForEpisode()
     {
-        behaviourTimer = 0f;
         ApplyBehaviourParameterSets();
     }
 
@@ -260,37 +227,6 @@ public class BehaviourSelector : MonoBehaviour
             int idx = Mathf.Clamp(currentObstaclePitchSetIndex, 0, obstaclePitchParamSets.Length - 1);
             obstaclePitchParamSets[idx] = new PIDGains(obstaclePitchPID.controller.Kp, obstaclePitchPID.controller.Ki, obstaclePitchPID.controller.Kd);
         }
-    }
-
-    public void ApplyBehaviourTraining()
-    {
-        if (!enableBehaviourTraining || behaviourNN == null)
-        {
-            return;
-        }
-
-        episodesSinceBehaviourTraining++;
-        if (episodesSinceBehaviourTraining < Mathf.Max(1, behaviourTrainingInterval))
-        {
-            return;
-        }
-
-        if (behaviourTrainingInputs.Count > 0 && behaviourTrainingTargets.Count > 0)
-        {
-            try
-            {
-                float[][] inputArray = behaviourTrainingInputs.ToArray();
-                int[] targetArray = behaviourTrainingTargets.ToArray();
-                behaviourNN.Train(inputArray, targetArray, behaviourLearningRate, Mathf.Max(1, behaviourEpochs));
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[PlayerDrone] BehaviourNN training failed: {e.Message}");
-            }
-        }
-        behaviourTrainingInputs.Clear();
-        behaviourTrainingTargets.Clear();
-        episodesSinceBehaviourTraining = 0;
     }
 
     public Vector3 CalculateObstacleVector(Transform droneTransform)
@@ -430,27 +366,6 @@ public class BehaviourSelector : MonoBehaviour
         }
     }
 
-    private int InitializeBehaviourNetwork()
-    {
-        int paramCount = Mathf.Min(heightParamSets.Length,
-            Mathf.Min(distanceParamSets.Length,
-                Mathf.Min(pitchParamSets.Length,
-                    Mathf.Min(yawParamSets.Length,
-                        Mathf.Min(rollParamSets.Length,
-                            Mathf.Min(obstacleWeightParamSets.Length,
-                                Mathf.Min(obstacleYawParamSets.Length, obstaclePitchParamSets.Length)))))));
-        if (paramCount <= 0)
-        {
-            behaviourNN = null;
-            return 0;
-        }
-        if (behaviourNN == null)
-        {
-            Debug.LogWarning($"[PlayerDrone] BehaviourNN not assigned on {gameObject.name}; persistence will skip weight loading.");
-        }
-        return paramCount;
-    }
-
     private void LoadTrainingState()
     {
         string droneId = gameObject.name;
@@ -494,20 +409,18 @@ public class BehaviourSelector : MonoBehaviour
 
     public void ApplyBehaviourParameterSets()
     {
-        if (behaviourNN == null)
+        int behaviourIndex = Mathf.Max(0, behaviourStaticIndex);
+        if (!loggedStaticBehaviourSet)
         {
-            return;
-        }
-
-        float[] inputs = GetBehaviourInputs();
-        int behaviourIndex = behaviourtrainingIndex;
-        try
-        {
-            behaviourIndex = behaviourNN.SelectParamSet(inputs);
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[PlayerDrone] BehaviourNN selection failed for {name} with inputs length {(inputs == null ? 0 : inputs.Length)}: {e.Message}");
+            try
+            {
+                Debug.Log($"[PlayerDrone] Using static PID set index {behaviourIndex} for {name}.");
+                loggedStaticBehaviourSet = true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PlayerDrone] Static PID set logging failed: {e.Message}");
+            }
         }
 
         int countHeight = heightParamSets != null ? heightParamSets.Length : 0;
@@ -589,23 +502,6 @@ public class BehaviourSelector : MonoBehaviour
             obstaclePitchPID.controller.Kp = g.Kp;
             obstaclePitchPID.controller.Ki = g.Ki;
             obstaclePitchPID.controller.Kd = g.Kd;
-        }
-
-        if (enableBehaviourTraining)
-        {
-            float[] inputCopy = null;
-            int indexCopy = behaviourIndex;
-            float[] rawInputs = GetBehaviourInputs();
-            if (rawInputs != null)
-            {
-                inputCopy = new float[rawInputs.Length];
-                rawInputs.CopyTo(inputCopy, 0);
-            }
-            if (inputCopy != null)
-            {
-                behaviourTrainingInputs.Add(inputCopy);
-                behaviourTrainingTargets.Add(indexCopy);
-            }
         }
     }
 

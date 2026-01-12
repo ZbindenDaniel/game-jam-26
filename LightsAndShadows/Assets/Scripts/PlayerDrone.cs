@@ -455,7 +455,6 @@ public class PlayerDrone : MonoBehaviour
             if (behaviourSelector != null)
             {
                 behaviourSelector.ApplyAutoTuning(simulationTimer);
-                behaviourSelector.ApplyBehaviourTraining();
             }
             // Reset for the next episode
             ResetEpisode();
