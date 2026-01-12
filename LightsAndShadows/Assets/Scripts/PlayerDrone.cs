@@ -258,7 +258,12 @@ public class PlayerDrone : MonoBehaviour
             Quaternion pitchRotation = Quaternion.AngleAxis(obstaclePitchOutput * Mathf.Rad2Deg, transform.right);
             adjustedObstacle = yawRotation * pitchRotation * normalizedObstacle * obstacleMagnitude * obstacleWeightScale;
         }
-        Vector3 desiredMovement = (toTarget + adjustedObstacle) * 0.5f;
+        Vector3 combinedVector = toTarget + adjustedObstacle;
+        if (combinedVector.sqrMagnitude <= Mathf.Epsilon)
+        {
+            combinedVector = toTarget;
+        }
+        Vector3 desiredMovement = combinedVector * 0.5f;
         float waypointMagnitude = toTarget.magnitude;
         float movementDot = 1f;
         if (toTarget.sqrMagnitude > Mathf.Epsilon && adjustedObstacle.sqrMagnitude > Mathf.Epsilon)
@@ -293,7 +298,7 @@ public class PlayerDrone : MonoBehaviour
         {
             if (Time.time - lastAvoidancePidLogTime >= avoidanceLogInterval)
             {
-                Debug.Log($"[PlayerDrone] Avoidance PID outputs: weight={obstacleWeightOutput:F2}, yaw={obstacleYawOutput:F2}, pitch={obstaclePitchOutput:F2}, vector={adjustedObstacle}");
+                Debug.Log($"[PlayerDrone] Avoidance PID outputs: weight={obstacleWeightOutput:F2}, yaw={obstacleYawOutput:F2}, pitch={obstaclePitchOutput:F2}, vector={adjustedObstacle}, combined={combinedVector}");
                 lastAvoidancePidLogTime = Time.time;
             }
         }
@@ -305,10 +310,13 @@ public class PlayerDrone : MonoBehaviour
         float heightError = (defaultAltitude + dynamicAltitudeOffset) - transform.position.y;
         // Horizontal distance error in XZ plane
         Vector3 toTargetXZ = Vector3.ProjectOnPlane(toTarget, Vector3.up);
-        float distanceError = toTargetXZ.magnitude - desiredDistance;
+        Vector3 combinedXZ = Vector3.ProjectOnPlane(combinedVector, Vector3.up);
+        float distanceError = combinedXZ.magnitude - desiredDistance;
         // Yaw error as signed angle between forward and target direction (degrees)
         Vector3 forwardXZ = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
-        float yawErrorDeg = Vector3.SignedAngle(forwardXZ, toTargetXZ, Vector3.up);
+        float yawErrorDeg = combinedXZ.sqrMagnitude > Mathf.Epsilon && forwardXZ.sqrMagnitude > Mathf.Epsilon
+            ? Vector3.SignedAngle(forwardXZ, combinedXZ, Vector3.up)
+            : 0f;
 
         AutoTunePID heightPID = behaviourSelector != null ? behaviourSelector.HeightPID : null;
         AutoTunePID distancePID = behaviourSelector != null ? behaviourSelector.DistancePID : null;
