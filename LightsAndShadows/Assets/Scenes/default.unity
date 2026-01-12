@@ -2580,11 +2580,7 @@ MonoBehaviour:
   pitchParamSets: []
   yawParamSets: []
   rollParamSets: []
-  behaviourtrainingIndex: 0
-  behaviourUpdateInterval: 0.5
   logBehaviourInputs: 0
-  behaviourInputLogInterval: 1
-  behaviourNN: {fileID: 2082835808}
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -2596,9 +2592,6 @@ MonoBehaviour:
   goalProfiles: []
   logGoalProfilePerEpisode: 1
   enableBehaviourTraining: 0
-  behaviourTrainingInterval: 1
-  behaviourLearningRate: 0.01
-  behaviourEpochs: 1
 --- !u!54 &948834216
 Rigidbody:
   m_ObjectHideFlags: 0
