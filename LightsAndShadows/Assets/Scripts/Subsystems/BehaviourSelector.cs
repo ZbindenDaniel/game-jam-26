@@ -319,25 +319,33 @@ public class BehaviourSelector : MonoBehaviour
         Vector3 obstacleVector = Vector3.zero;
         foreach (Collider collider in nearby)
         {
-            if (collider == null)
+            try
             {
-                continue;
-            }
+                if (collider == null)
+                {
+                    continue;
+                }
 
-            if (collider.attachedRigidbody == rb || collider.transform.IsChildOf(droneTransform))
+                if (collider.attachedRigidbody == rb || collider.transform.IsChildOf(droneTransform))
+                {
+                    continue;
+                }
+
+                Vector3 toObstacle = collider.bounds.center - droneTransform.position;
+                float distance = toObstacle.magnitude;
+                if (distance <= Mathf.Epsilon)
+                {
+                    continue;
+                }
+
+                float weight = 1f / Mathf.Max(distance, Mathf.Epsilon);
+                Vector3 away = -toObstacle.normalized;
+                obstacleVector += away * weight;
+            }
+            catch (Exception ex)
             {
-                continue;
+                Debug.LogWarning($"[PlayerDrone] Obstacle processing failed: {ex.Message}");
             }
-
-            Vector3 toObstacle = droneTransform.position - collider.bounds.center;
-            float distance = toObstacle.magnitude;
-            if (distance <= Mathf.Epsilon)
-            {
-                continue;
-            }
-
-            float weight = 1f / distance;
-            obstacleVector += toObstacle.normalized * weight;
         }
 
         return obstacleVector;
