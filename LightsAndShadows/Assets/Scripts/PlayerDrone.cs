@@ -369,9 +369,46 @@ public class PlayerDrone : MonoBehaviour
         // Horizontal distance error in XZ plane
         Vector3 toTargetXZ = Vector3.ProjectOnPlane(toTarget, Vector3.up);
         float distanceError = toTargetXZ.magnitude - desiredDistance;
-        // Yaw error as signed angle between forward and target direction (degrees)
+        // Yaw error as signed angle between forward and desired movement direction (degrees)
         Vector3 forwardXZ = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
-        float yawErrorDeg = Vector3.SignedAngle(forwardXZ, toTargetXZ, Vector3.up);
+        Vector3 desiredYawRef = Vector3.zero;
+        bool desiredYawRefValid = true;
+        try
+        {
+            desiredYawRef = Vector3.ProjectOnPlane(desiredMovement, Vector3.up);
+            if (desiredYawRef.sqrMagnitude > Mathf.Epsilon)
+            {
+                desiredYawRef = desiredYawRef.normalized;
+            }
+            if (desiredYawRef.sqrMagnitude <= Mathf.Epsilon || float.IsNaN(desiredYawRef.x) || float.IsNaN(desiredYawRef.y) || float.IsNaN(desiredYawRef.z))
+            {
+                desiredYawRef = Vector3.zero;
+                desiredYawRefValid = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            desiredYawRef = Vector3.zero;
+            desiredYawRefValid = false;
+            Debug.LogWarning($"[PlayerDrone] Desired yaw reference calculation failed: {ex.Message}");
+        }
+        if (!desiredYawRefValid)
+        {
+            try
+            {
+                if (Time.time - lastTargetLogTime >= avoidanceLogInterval)
+                {
+                    Debug.LogWarning("[PlayerDrone] Desired movement invalid; yaw reference set to zero.");
+                    lastTargetLogTime = Time.time;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PlayerDrone] Desired yaw reference logging failed: {ex.Message}");
+            }
+        }
+        Vector3 yawReference = desiredYawRefValid ? desiredYawRef : toTargetXZ;
+        float yawErrorDeg = Vector3.SignedAngle(forwardXZ, yawReference, Vector3.up);
 
         AutoTunePID heightPID = behaviourSelector != null ? behaviourSelector.HeightPID : null;
         AutoTunePID distancePID = behaviourSelector != null ? behaviourSelector.DistancePID : null;
@@ -394,10 +431,27 @@ public class PlayerDrone : MonoBehaviour
         float pitchError = desiredPitchRad - currentPitchRad;
         float pitchCmd = pitchPID.controller.Update(pitchError, dt);
         float yawCmd = yawPID.controller.Update(yawErrorDeg * Mathf.Deg2Rad, dt);
-        // Roll control: compute roll error (drone should remain level)
-        float rollErrorRad = Mathf.Asin(Mathf.Clamp(transform.right.y, -1f, 1f));
+        // Roll control: compute roll error toward a small bank in the desired lateral direction
+        float currentRollRad = Mathf.Asin(Mathf.Clamp(transform.right.y, -1f, 1f));
+        float desiredRollRad = 0f;
+        try
+        {
+            Vector3 desiredLocal = transform.InverseTransformDirection(desiredMovement);
+            if (float.IsNaN(desiredLocal.x) || float.IsNaN(desiredLocal.y) || float.IsNaN(desiredLocal.z))
+            {
+                throw new InvalidOperationException("Desired movement local direction is NaN.");
+            }
+            float lateral = Mathf.Clamp(desiredLocal.x, -1f, 1f);
+            desiredRollRad = Mathf.Clamp(lateral * maxPitchAngleDeg * Mathf.Deg2Rad * 0.5f, -maxPitchAngleDeg * Mathf.Deg2Rad, maxPitchAngleDeg * Mathf.Deg2Rad);
+        }
+        catch (Exception ex)
+        {
+            desiredRollRad = 0f;
+            Debug.LogWarning($"[PlayerDrone] Desired roll calculation failed: {ex.Message}");
+        }
+        float rollErrorRad = desiredRollRad - currentRollRad;
         float rollCmd = rollPID.controller.Update(rollErrorRad, dt);
-        float tiltDeg = Mathf.Max(Mathf.Abs(currentPitchRad), Mathf.Abs(rollErrorRad)) * Mathf.Rad2Deg;
+        float tiltDeg = Mathf.Max(Mathf.Abs(currentPitchRad), Mathf.Abs(currentRollRad)) * Mathf.Rad2Deg;
         // Clamp outputs to avoid saturating thrusters and introducing jitter
         float pitchOut = Mathf.Clamp(pitchCmd, -1f, 1f);
         float rollOut = Mathf.Clamp(rollCmd, -1f, 1f);
