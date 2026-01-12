@@ -87,7 +87,7 @@ public class MetricsRecorder : MonoBehaviour
         {
             if (rb != null)
             {
-                sumSpeed += rb.velocity.magnitude * dt;
+                sumSpeed += rb.linearVelocity.magnitude * dt;
                 sumAngularVelocity += rb.angularVelocity.magnitude * dt;
             }
         }

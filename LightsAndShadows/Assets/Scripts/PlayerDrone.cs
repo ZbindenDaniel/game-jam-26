@@ -228,6 +228,9 @@ public class PlayerDrone : MonoBehaviour
 
         // Compute control errors
         Vector3 toTarget = targetPos - transform.position;
+        // clamp it to max 10
+        toTarget = Vector3.ClampMagnitude(toTarget, 10f);
+        
         Vector3 obstacleVector = Vector3.zero;
         try
         {

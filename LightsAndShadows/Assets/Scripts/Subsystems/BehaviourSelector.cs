@@ -274,7 +274,7 @@ public class BehaviourSelector : MonoBehaviour
                     continue;
                 }
 
-                float weight = 1f / Mathf.Max(distance, Mathf.Epsilon);
+                float weight = 25f / Mathf.Max(distance-8f, Mathf.Epsilon);
                 Vector3 away = -toObstacle.normalized;
                 obstacleVector += away * weight;
             }
