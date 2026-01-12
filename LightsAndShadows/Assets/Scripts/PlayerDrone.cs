@@ -148,6 +148,10 @@ public class PlayerDrone : MonoBehaviour
         {
             Debug.LogWarning($"[PlayerDrone] MetricsRecorder missing on {gameObject.name}.");
         }
+        if (behaviourSelector != null)
+        {
+            Debug.Log("[PlayerDrone] BehaviourSelector NN updates are disabled for this controller.");
+        }
         initialPosition = transform.position;
         initialRotation = transform.rotation;
         defaultAltitude = targetAltitude;
@@ -180,10 +184,6 @@ public class PlayerDrone : MonoBehaviour
         if (energyController != null)
         {
             energyController.Tick(dt);
-        }
-        if (behaviourSelector != null)
-        {
-            behaviourSelector.TickBehaviour(dt);
         }
 
         // Determine the current target.  If a waypoint is assigned use its
