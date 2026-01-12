@@ -27,6 +27,7 @@ public class AutoTunePID
     private float gradKp;
     private float gradKi;
     private float gradKd;
+    private bool integralClampLogged;
     /// <summary>
     /// Call once per frame to accumulate gradient information for the
     /// controller.  The supplied error is the control error for the
@@ -42,6 +43,27 @@ public class AutoTunePID
     {
         // Accumulate the integral of the error for the Ki gradient
         integralSum += error * dt;
+        try
+        {
+            float integralLimit = controller != null ? Mathf.Abs(controller.integralLimit) : 0f;
+            if (integralLimit > 0f)
+            {
+                float clampedIntegral = Mathf.Clamp(integralSum, -integralLimit, integralLimit);
+                if (clampedIntegral != integralSum)
+                {
+                    integralSum = clampedIntegral;
+                    if (!integralClampLogged)
+                    {
+                        Debug.Log($"AutoTunePID AccumulateGradients: integralSum clamped to ±{integralLimit}.");
+                        integralClampLogged = true;
+                    }
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"AutoTunePID AccumulateGradients clamp failed: {ex}");
+        }
         // Derivative of the error for Kp and Kd gradients
         float derivative = dt > 0f ? (error - prevError) / dt : 0f;
         // Gradients: accumulate correlation terms.  These can be
@@ -106,6 +128,7 @@ public class AutoTunePID
         gradKp = 0f;
         gradKi = 0f;
         gradKd = 0f;
+        integralClampLogged = false;
         if (controller != null)
         {
             controller.Reset();
