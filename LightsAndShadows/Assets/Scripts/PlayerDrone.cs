@@ -99,6 +99,7 @@ public class PlayerDrone : MonoBehaviour
     public float avoidanceDotThreshold = -0.1f;
     public float avoidanceMinMagnitude = 0.5f;
     public float avoidanceLogInterval = 1f;
+    public float maxTargetInfluence = 6f;
 
     // Internal runtime state
     private Rigidbody rb;
@@ -115,6 +116,7 @@ public class PlayerDrone : MonoBehaviour
     private float dynamicAltitudeOffset;
     private float lastAvoidanceLogTime = float.NegativeInfinity;
     private float lastAvoidancePidLogTime = float.NegativeInfinity;
+    private float lastTargetLogTime = float.NegativeInfinity;
 
     // ------------------------------------------------------------------------
     // Unity lifecycle methods
@@ -258,16 +260,55 @@ public class PlayerDrone : MonoBehaviour
             Quaternion pitchRotation = Quaternion.AngleAxis(obstaclePitchOutput * Mathf.Rad2Deg, transform.right);
             adjustedObstacle = yawRotation * pitchRotation * normalizedObstacle * obstacleMagnitude * obstacleWeightScale;
         }
-        Vector3 desiredMovement = (toTarget + adjustedObstacle) * 0.5f;
-        float waypointMagnitude = toTarget.magnitude;
-        float movementDot = 1f;
-        if (toTarget.sqrMagnitude > Mathf.Epsilon && adjustedObstacle.sqrMagnitude > Mathf.Epsilon)
+        Vector3 targetDir = Vector3.zero;
+        bool targetDirValid = true;
+        try
         {
-            movementDot = Vector3.Dot(toTarget.normalized, adjustedObstacle.normalized);
+            targetDir = toTarget.sqrMagnitude > Mathf.Epsilon ? toTarget.normalized : Vector3.zero;
+            if (float.IsNaN(targetDir.x) || float.IsNaN(targetDir.y) || float.IsNaN(targetDir.z))
+            {
+                targetDir = Vector3.zero;
+                targetDirValid = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            targetDir = Vector3.zero;
+            targetDirValid = false;
+            Debug.LogWarning($"[PlayerDrone] Target direction normalization failed: {ex.Message}");
+        }
+        float waypointMagnitude = toTarget.magnitude;
+        float targetInfluenceMagnitude = Mathf.Max(avoidanceMinMagnitude, Mathf.Min(waypointMagnitude, maxTargetInfluence));
+        Vector3 targetInfluence = targetDir * targetInfluenceMagnitude;
+        Vector3 desiredMovement = (targetInfluence + adjustedObstacle) * 0.5f;
+        float movementDot = 1f;
+        if (targetInfluence.sqrMagnitude > Mathf.Epsilon && adjustedObstacle.sqrMagnitude > Mathf.Epsilon)
+        {
+            movementDot = Vector3.Dot(targetInfluence.normalized, adjustedObstacle.normalized);
         }
         if (!Mathf.Approximately(defaultAltitude, targetAltitude))
         {
             defaultAltitude = targetAltitude;
+        }
+        try
+        {
+            if (Time.time - lastTargetLogTime >= avoidanceLogInterval)
+            {
+                if (!targetDirValid)
+                {
+                    Debug.LogWarning("[PlayerDrone] Target direction invalid; using zero vector.");
+                    lastTargetLogTime = Time.time;
+                }
+                else if (waypointMagnitude > maxTargetInfluence)
+                {
+                    Debug.Log($"[PlayerDrone] Target influence clamped. Dist={waypointMagnitude:F2}, Clamp={maxTargetInfluence:F2}");
+                    lastTargetLogTime = Time.time;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PlayerDrone] Target influence logging failed: {ex.Message}");
         }
         bool avoidanceTriggered = movementDot < avoidanceDotThreshold || desiredMovement.magnitude < avoidanceMinMagnitude;
         float desiredMagnitude = Mathf.Max(avoidanceMinMagnitude, (waypointMagnitude + obstacleMagnitude) * 0.5f);
@@ -287,6 +328,21 @@ public class PlayerDrone : MonoBehaviour
             catch (Exception ex)
             {
                 Debug.LogWarning($"[PlayerDrone] Avoidance logging failed: {ex.Message}");
+            }
+        }
+        else if (adjustedObstacle.sqrMagnitude > Mathf.Epsilon)
+        {
+            try
+            {
+                if (Time.time - lastTargetLogTime >= avoidanceLogInterval)
+                {
+                    Debug.Log($"[PlayerDrone] Avoidance suppressed. Dot={movementDot:F2}, TargetMag={targetInfluenceMagnitude:F2}, ObstMag={obstacleMagnitude:F2}");
+                    lastTargetLogTime = Time.time;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PlayerDrone] Avoidance suppression logging failed: {ex.Message}");
             }
         }
         try
