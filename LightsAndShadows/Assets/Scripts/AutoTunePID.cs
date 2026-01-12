@@ -47,7 +47,7 @@ public class AutoTunePID
         // Gradients: accumulate correlation terms.  These can be
         // positive or negative depending on whether error is increasing
         // or decreasing.  This allows gains to adjust in both directions.
-        gradKp += error;
+        gradKp += error * derivative;
         gradKi += error * integralSum;
         gradKd += error * derivative;
         // Store previous error for next derivative calculation
@@ -63,21 +63,35 @@ public class AutoTunePID
     /// </summary>
     public void ApplyTuning(float episodeDuration, float learningRate)
     {
-        if (!optimize || episodeDuration <= 0f) {
-            ResetTuning();
-            return;
+        try
+        {
+            if (!optimize || episodeDuration <= 0f) {
+                return;
+            }
+            float scale = 1f / episodeDuration;
+            float preKp = controller.Kp;
+            float preKi = controller.Ki;
+            float preKd = controller.Kd;
+            // Gradient update: adjust gains in the direction indicated by the
+            // accumulated gradients.  A positive gradient will increase the
+            // corresponding gain and a negative gradient will decrease it.  Gains
+            // are clamped to zero to prevent negative values, but can grow
+            // arbitrarily large if the optimiser dictates.
+            controller.Kp = Mathf.Max(0f, controller.Kp - learningRate * gradKp * scale);
+            controller.Ki = Mathf.Max(0f, controller.Ki - learningRate * gradKi * scale);
+            controller.Kd = Mathf.Max(0f, controller.Kd - learningRate * gradKd * scale);
+            Debug.Log(
+                $"AutoTunePID ApplyTuning: Kp {preKp} -> {controller.Kp}, Ki {preKi} -> {controller.Ki}, Kd {preKd} -> {controller.Kd}");
         }
-        float scale = 1f / episodeDuration;
-        // Gradient update: adjust gains in the direction indicated by the
-        // accumulated gradients.  A positive gradient will increase the
-        // corresponding gain and a negative gradient will decrease it.  Gains
-        // are clamped to zero to prevent negative values, but can grow
-        // arbitrarily large if the optimiser dictates.
-        controller.Kp = Mathf.Max(0f, controller.Kp + learningRate * gradKp * scale);
-        controller.Ki = Mathf.Max(0f, controller.Ki + learningRate * gradKi * scale);
-        controller.Kd = Mathf.Max(0f, controller.Kd + learningRate * gradKd * scale);
-        // Reset gradient state after tuning
-        ResetTuning();
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"AutoTunePID ApplyTuning failed: {ex}");
+        }
+        finally
+        {
+            // Reset gradient state after tuning
+            ResetTuning();
+        }
     }
     /// <summary>
     /// Resets the gradient accumulation and PID internal state.  Call
