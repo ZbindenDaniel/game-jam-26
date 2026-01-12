@@ -232,6 +232,10 @@ public class PlayerDrone : MonoBehaviour
         try
         {
             obstacleVector = behaviourSelector != null ? behaviourSelector.CalculateObstacleVector(transform) : Vector3.zero;
+            if (obstacleVector.sqrMagnitude > Mathf.Epsilon)
+            {
+                Debug.DrawLine(transform.position, transform.position + obstacleVector, Color.red);
+            }
         }
         catch (Exception ex)
         {
