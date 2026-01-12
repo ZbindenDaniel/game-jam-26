@@ -2536,10 +2536,22 @@ MonoBehaviour:
   thrusterBR: {fileID: 1168340640}
   yawThrusterLeft: {fileID: 1374546418}
   yawThrusterRight: {fileID: 1656840600}
-  maxLiftThrustPerThruster: 10
+  maxLiftThrustPerThruster: 15
   maxYawThrust: 5
   maxPitchAngleDeg: 20
   thrustSmoothing: 0.33
+  maxEnergy: 100
+  energy: 100
+  energyDrainRate: 0.5
+  energyRechargeRate: 10
+  minEnergyThrustMultiplier: 0.2
+  sunLight: {fileID: 846727617}
+  lightOccluderLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  lightCheckOffset: 0.1
+  logEnergyChanges: 0
+  energyLogInterval: 1
   currentWaypoint: {fileID: 0}
   targetAltitude: 8
   desiredDistance: 0
@@ -2562,6 +2574,7 @@ MonoBehaviour:
   display: {fileID: 0}
   persistMetrics: 1
   metricsFilename: drone_metrics.json
+  logCollisionMetrics: 0
   heightParamSets: []
   distanceParamSets: []
   pitchParamSets: []
@@ -2575,6 +2588,13 @@ MonoBehaviour:
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 4294967295
+  maxAvoidanceClimb: 3
+  avoidanceDotThreshold: -0.1
+  avoidanceMinMagnitude: 0.5
+  avoidanceLogInterval: 1
+  goalProfileIndex: 0
+  goalProfiles: []
+  logGoalProfilePerEpisode: 1
   enableBehaviourTraining: 0
   behaviourTrainingInterval: 1
   behaviourLearningRate: 0.01
@@ -5303,6 +5323,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c56e3cb3da1aadac81a2b9aefb35ca7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BehaviourNN
+  numInputs: 0
+  paramCount: 0
+  weights: []
+  bias: 0
   persistWeights: 1
 --- !u!4 &2082835809
 Transform:
